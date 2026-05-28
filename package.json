@@ -1,0 +1,10 @@
+{
+  "name": "onimaru-menu-ui",
+  "private": true,
+  "scripts": {
+    "dev": "live-server . --port=5173 --open=index.html --watch=index.html,shadow.css,app.js,dev.js --no-browser=false"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}

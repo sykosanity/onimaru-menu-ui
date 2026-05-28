@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Onimaru Menu</title>
+<style>
+:root {
+    --menu-color: 138, 43, 226;
+    --bg-deep: #0e0e10;
+    --bg-panel: #141416;
+    --bg-sidebar: #111113;
+    --bg-row-active: #222228;
+    --text: #f2f2f4;
+    --text-dim: #9a9aa8;
+    --border: rgba(138, 43, 226, 0.45);
+    --accent: rgb(var(--menu-color));
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent !important;
+    font-family: "Segoe UI", Inter, system-ui, sans-serif;
+    color: var(--text);
+}
+
+#root {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.shadow-menu {
+    position: absolute;
+    left: 3.2vw;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 52vw;
+    min-width: 680px;
+    max-width: 920px;
+    background: var(--bg-deep);
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.72);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+}
+
+.shadow-menu.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.top-accent {
+    height: 3px;
+    width: 100%;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    box-shadow: 0 0 12px rgba(var(--menu-color), 0.55);
+}
+
+.menu-body {
+    display: flex;
+    min-height: 420px;
+    max-height: 72vh;
+}
+
+.sidebar {
+    width: 168px;
+    flex-shrink: 0;
+    background: var(--bg-sidebar);
+    border-right: 1px solid rgba(255, 255, 255, 0.04);
+    padding: 16px 0 12px;
+    display: flex;
+    flex-direction: column;
+}
+
+.brand {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--text);
+    padding: 0 18px 14px;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.gear-icon {
+    font-size: 14px;
+    color: var(--accent);
+    opacity: 0.9;
+    width: 16px;
+    text-align: center;
+    line-height: 1;
+}
+
+.sidebar-item.active {
+    background: var(--bg-row-active);
+    color: var(--text);
+}
+
+.content {
+    flex: 1;
+    display: flex;
+    min-width: 0;
+    background: var(--bg-panel);
+}
+
+.content-columns {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+}
+
+.content-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border-right: 1px solid var(--border);
+}
+
+.content-column:last-child {
+    border-right: none;
+}
+
+.content-column.inactive {
+    opacity: 0.72;
+}
+
+.column-header {
+    padding: 14px 18px 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.column-items {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0 12px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--menu-color), 0.35) transparent;
+}
+
+.column-items::-webkit-scrollbar {
+    width: 4px;
+}
+
+.column-items::-webkit-scrollbar-thumb {
+    background: rgba(var(--menu-color), 0.4);
+    border-radius: 4px;
+}
+
+.menu-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 18px;
+    min-height: 36px;
+    font-size: 13px;
+    color: #d4d4dc;
+    transition: background 0.12s ease;
+}
+
+.menu-row.active {
+    background: var(--bg-row-active);
+    color: var(--text);
+}
+
+.menu-row.divider-row {
+    pointer-events: none;
+    padding: 10px 18px 6px;
+    min-height: auto;
+}
+
+.divider-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(var(--menu-color), 0.75);
+}
+
+.row-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.row-label .locked {
+    color: #fc3030;
+    font-size: 11px;
+}
+
+.row-label .hazard {
+    color: #fcb603;
+    font-size: 11px;
+}
+
+.row-control {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toggle {
+    width: 38px;
+    height: 20px;
+    border-radius: 20px;
+    background: #2a2a32;
+    position: relative;
+    transition: background 0.2s ease;
+}
+
+.toggle.on {
+    background: rgba(var(--menu-color), 0.55);
+    box-shadow: 0 0 10px rgba(var(--menu-color), 0.35);
+}
+
+.toggle::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #8e8e9a;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.toggle.on::after {
+    transform: translateX(18px);
+    background: #fff;
+}
+
+.scroll-value {
+    font-size: 12px;
+    color: var(--text-dim);
+    background: #1e1e24;
+    padding: 3px 8px;
+    border-radius: 4px;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.slider-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 120px;
+}
+
+.slider-track {
+    flex: 1;
+    height: 4px;
+    background: #2a2a32;
+    border-radius: 4px;
+    position: relative;
+    min-width: 72px;
+}
+
+.slider-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+    box-shadow: 0 0 8px rgba(var(--menu-color), 0.45);
+}
+
+.slider-thumb {
+    position: absolute;
+    top: 50%;
+    width: 10px;
+    height: 10px;
+    margin-top: -5px;
+    margin-left: -5px;
+    background: #fff;
+    border-radius: 2px;
+    box-shadow: 0 0 6px rgba(var(--menu-color), 0.5);
+}
+
+.slider-num {
+    font-size: 12px;
+    color: var(--text);
+    min-width: 32px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.sub-arrow {
+    font-size: 12px;
+    color: rgba(var(--menu-color), 0.7);
+}
+
+.menu-footer {
+    padding: 10px 18px;
+    font-size: 12px;
+    color: var(--text-dim);
+    text-align: right;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    background: var(--bg-deep);
+}
+
+.desc-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 4vw;
+    transform: translateX(-50%);
+    max-width: 520px;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.82);
+    border-radius: 6px;
+    border-left: 3px solid var(--accent);
+    font-size: 12px;
+    color: #eee;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+    z-index: 100;
+}
+
+.desc-toast.visible {
+    opacity: 1;
+}
+
+.input-wrapper {
+    position: fixed;
+    left: 50%;
+    bottom: 8vw;
+    transform: translateX(-50%);
+    width: 420px;
+    background: #0a0a0c;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid rgba(var(--menu-color), 0.35);
+    display: none;
+    z-index: 200;
+}
+
+.input-wrapper.visible {
+    display: block;
+}
+
+.input-header {
+    padding: 10px 14px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(var(--menu-color), 0.4);
+    color: var(--text);
+}
+
+.input-body {
+    padding: 14px;
+    background: #101012;
+}
+
+.input-body span {
+    font-size: 13px;
+    color: #fff;
+}
+
+.input-body span::after {
+    content: "";
+    display: inline-block;
+    width: 2px;
+    height: 14px;
+    background: #fff;
+    margin-left: 2px;
+    vertical-align: middle;
+    animation: blink 1s steps(2, start) infinite;
+}
+
+@keyframes blink {
+    to { visibility: hidden; }
+}
+
+.kbl-wrapper {
+    position: fixed;
+    right: 1.2vw;
+    top: 1.2vw;
+    width: 160px;
+    background: rgba(0, 0, 0, 0.78);
+    border-radius: 4px;
+    overflow: hidden;
+    display: none;
+    z-index: 90;
+    border: 1px solid rgba(var(--menu-color), 0.25);
+}
+
+.kbl-wrapper.visible {
+    display: block;
+}
+
+.kbl-header {
+    padding: 8px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(var(--menu-color), 0.35);
+    color: var(--text);
+}
+
+.kbl-header .gear-icon {
+    margin-right: 6px;
+}
+
+.kbl-list {
+    padding: 6px;
+}
+
+.kbl-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    padding: 4px 6px;
+    color: #ddd;
+}
+
+.notifications {
+    position: fixed;
+    bottom: 1vw;
+    right: 1vw;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 300;
+    pointer-events: none;
+}
+
+.notification {
+    width: 280px;
+    background: rgba(10, 10, 12, 0.94);
+    border-left: 3px solid var(--accent);
+    padding: 10px 12px;
+    transform: translateX(120%);
+    transition: transform 0.35s ease, opacity 0.35s ease;
+    opacity: 0;
+}
+
+.notification.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.notification-title {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.notification-desc {
+    font-size: 11px;
+    color: #aaa;
+}
+
+.notification.error {
+    border-left-color: #e74c3c;
+}
+
+.notification.success {
+    border-left-color: #2ecc71;
+}
+
+.fc-wrapper {
+    position: fixed;
+    left: 50%;
+    bottom: 4vw;
+    transform: translateX(-50%);
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+    z-index: 80;
+}
+
+.fc-wrapper.visible {
+    display: flex;
+}
+
+.fc-option {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.fc-option.selected {
+    color: #fff;
+    text-shadow: 0 0 4px #000;
+}
+
+</style>
+</head>
+<body>
+<div id="root">
+<div id="shadow-menu" class="shadow-menu">
+<div class="top-accent"></div>
+<div class="menu-body">
+<aside class="sidebar">
+<h1 id="brand" class="brand">Onimaru</h1>
+<nav id="sidebar-nav" class="sidebar-nav"></nav>
+</aside>
+<main id="content" class="content"></main>
+</div>
+<footer id="menu-footer" class="menu-footer">.gg/Onimaru</footer>
+</div>
+<div id="desc-toast" class="desc-toast"></div>
+<div id="input-wrapper" class="input-wrapper">
+<div id="input-title" class="input-header">Input</div>
+<div class="input-body"><span id="input-value"></span></div>
+</div>
+<div id="kbl-wrapper" class="kbl-wrapper">
+<div class="kbl-header"><span class="gear-icon">&#9881;</span> Keybinds</div>
+<div id="kbl-list" class="kbl-list"></div>
+</div>
+<div id="notifications" class="notifications"></div>
+<div id="fc-wrapper" class="fc-wrapper"></div>
+</div>
+<script>
+(function () {
+    const state = {
+        visible: false,
+        elements: [],
+        index: 0,
+        categories: null,
+        categoryIndex: 0,
+        path: [],
+        sidebar: [],
+        sidebarActive: null,
+        username: "Onimaru",
+        menuColor: "138, 43, 226",
+    };
+
+    const menuEl = document.getElementById("shadow-menu");
+    const sidebarNav = document.getElementById("sidebar-nav");
+    const contentEl = document.getElementById("content");
+    const brandEl = document.getElementById("brand");
+    const footerEl = document.getElementById("menu-footer");
+    const descEl = document.getElementById("desc-toast");
+    const inputWrap = document.getElementById("input-wrapper");
+    const inputTitle = document.getElementById("input-title");
+    const inputValue = document.getElementById("input-value");
+    const kblWrap = document.getElementById("kbl-wrapper");
+    const kblList = document.getElementById("kbl-list");
+    const notifWrap = document.getElementById("notifications");
+    const fcWrap = document.getElementById("fc-wrapper");
+
+    function setMenuColor(rgb) {
+        if (!rgb) return;
+        state.menuColor = rgb;
+        document.documentElement.style.setProperty("--menu-color", rgb);
+    }
+
+    function escapeHtml(s) {
+        return String(s)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    function formatSliderValue(entry) {
+        const val = entry.value ?? entry.min ?? 0;
+        if (Number.isInteger(val)) return String(val);
+        return Number(val).toFixed(2).replace(/\.?0+$/, "");
+    }
+
+    function scrollableLabel(entry) {
+        if (!entry.values || !entry.values.length) return "";
+        const idx = Math.max(0, (entry.value || 1) - 1);
+        return entry.values[idx] || "";
+    }
+
+    function renderControl(entry) {
+        const type = entry.type || "button";
+        if (type === "checkbox" || type === "scrollable-checkbox" || type === "slider-checkbox") {
+            const on = !!entry.checked;
+            const extra =
+                type === "scrollable-checkbox"
+                    ? `<span class="scroll-value">${escapeHtml(scrollableLabel(entry))}</span>`
+                    : type === "slider-checkbox"
+                      ? `<span class="slider-num">${formatSliderValue(entry)}</span>`
+                      : "";
+            return `${extra}<div class="toggle ${on ? "on" : ""}"></div>`;
+        }
+        if (type === "slider") {
+            const min = entry.min ?? 0;
+            const max = entry.max ?? 100;
+            const val = entry.value ?? min;
+            const pct = max === min ? 0 : ((val - min) / (max - min)) * 100;
+            return `<div class="slider-wrap">
+                <div class="slider-track">
+                    <div class="slider-fill" style="width:${pct}%"></div>
+                    <div class="slider-thumb" style="left:${pct}%"></div>
+                </div>
+                <span class="slider-num">${formatSliderValue(entry)}</span>
+            </div>`;
+        }
+        if (type === "scrollable") {
+            return `<span class="scroll-value">${escapeHtml(scrollableLabel(entry))}</span>`;
+        }
+        if (type === "subMenu") {
+            return `<span class="sub-arrow">â€º</span>`;
+        }
+        return "";
+    }
+
+    function renderRow(entry, rowIndex, isActive) {
+        if (entry.type === "divider") {
+            return `<div class="menu-row divider-row" data-idx="${rowIndex}">
+                <span class="divider-label">${escapeHtml(entry.label || "")}</span>
+            </div>`;
+        }
+        let suffix = "";
+        if (entry.locked) suffix += ' <span class="locked">(Locked)</span>';
+        if (entry.hazardous) suffix += ' <span class="hazard">(Risk)</span>';
+        return `<div class="menu-row type-${entry.type || "button"} ${isActive ? "active" : ""}" data-idx="${rowIndex}">
+            <span class="row-label">${escapeHtml(entry.label || "")}${suffix}</span>
+            <div class="row-control">${renderControl(entry)}</div>
+        </div>`;
+    }
+
+    function visibleCategoryPair() {
+        const cats = state.categories;
+        if (!cats || !cats.length) return null;
+        if (cats.length <= 2) return { cats, activeCol: state.categoryIndex };
+        const start = Math.min(state.categoryIndex, Math.max(0, cats.length - 2));
+        return { cats: cats.slice(start, start + 2), activeCol: state.categoryIndex - start };
+    }
+
+    function renderContent() {
+        contentEl.innerHTML = "";
+        const pair = visibleCategoryPair();
+
+        if (pair && pair.cats.length) {
+            const cols = document.createElement("div");
+            cols.className = "content-columns";
+
+            pair.cats.forEach((cat, colIdx) => {
+                const col = document.createElement("div");
+                col.className = "content-column" + (colIdx !== pair.activeCol ? " inactive" : "");
+                col.innerHTML = `<div class="column-header">${escapeHtml(cat.label || "Section")}</div>`;
+                const list = document.createElement("div");
+                list.className = "column-items";
+
+                const tabs = cat.tabs || [];
+                const isActiveCol = colIdx === pair.activeCol;
+                tabs.forEach((entry, i) => {
+                    list.insertAdjacentHTML("beforeend", renderRow(entry, i, isActiveCol && i === state.index));
+                });
+
+                col.appendChild(list);
+                cols.appendChild(col);
+            });
+
+            contentEl.appendChild(cols);
+            return;
+        }
+
+        const col = document.createElement("div");
+        col.className = "content-column";
+        const header =
+            state.path.length > 1 ? state.path[state.path.length - 1] : state.path[0] || "Menu";
+        col.innerHTML = `<div class="column-header">${escapeHtml(header)}</div>`;
+        const list = document.createElement("div");
+        list.className = "column-items";
+        state.elements.forEach((entry, i) => {
+            list.insertAdjacentHTML("beforeend", renderRow(entry, i, i === state.index));
+        });
+        col.appendChild(list);
+        contentEl.appendChild(col);
+    }
+
+    function renderSidebar() {
+        sidebarNav.innerHTML = "";
+        const items = state.sidebar.length ? state.sidebar : state.elements;
+        const hoveredLabel = state.elements[state.index]?.label;
+
+        items.forEach((entry) => {
+            if (entry.type !== "subMenu") return;
+            const label = entry.label || "Item";
+            const isActive = state.sidebarActive
+                ? state.sidebarActive === label
+                : hoveredLabel === label;
+            const el = document.createElement("div");
+            el.className = "sidebar-item" + (isActive ? " active" : "");
+            el.innerHTML = `<span class="gear-icon" aria-hidden="true">\u2699</span><span>${escapeHtml(label)}</span>`;
+            sidebarNav.appendChild(el);
+        });
+    }
+
+    function updateDesc() {
+        const pair = visibleCategoryPair();
+        let entry = null;
+        if (pair && pair.cats[pair.activeCol]) {
+            entry = pair.cats[pair.activeCol].tabs?.[state.index];
+        } else {
+            entry = state.elements[state.index];
+        }
+        const text = entry?.desc || "";
+        if (text && state.visible) {
+            descEl.textContent = text;
+            descEl.classList.add("visible");
+        } else {
+            descEl.classList.remove("visible");
+        }
+    }
+
+    function render() {
+        if (!menuEl) return;
+        menuEl.classList.toggle("visible", state.visible);
+        brandEl.textContent = state.username || "Onimaru";
+        footerEl.textContent = ".gg/Onimaru";
+        renderSidebar();
+        renderContent();
+        updateDesc();
+        requestAnimationFrame(() => {
+            document.querySelector(".menu-row.active")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        });
+    }
+
+    function applyPayload(data) {
+        if (typeof data.username === "string") state.username = data.username;
+        if (data.elements) state.elements = data.elements;
+        if (typeof data.index === "number") state.index = data.index;
+        if (data.categories) state.categories = data.categories;
+        else if (data.action === "showUI" && !data.categories) state.categories = null;
+        if (typeof data.categoryIndex === "number") state.categoryIndex = data.categoryIndex;
+        if (data.path) state.path = data.path;
+        if (data.sidebar) state.sidebar = data.sidebar;
+        if (data.sidebarActive !== undefined) state.sidebarActive = data.sidebarActive;
+        if (data.bannerColor) setMenuColor(data.bannerColor);
+    }
+
+    function showNotification(data) {
+        const el = document.createElement("div");
+        el.className = "notification " + (data.type || "info");
+        el.innerHTML = `<div class="notification-title">${escapeHtml(data.title || "Notice")}</div>
+            <div class="notification-desc">${escapeHtml(data.desc || data.message || "")}</div>`;
+        notifWrap.appendChild(el);
+        requestAnimationFrame(() => el.classList.add("show"));
+        setTimeout(() => {
+            el.classList.remove("show");
+            setTimeout(() => el.remove(), 400);
+        }, data.duration || 3000);
+    }
+
+    function renderKeybinds(binds) {
+        kblList.innerHTML = "";
+        (binds || []).forEach((b) => {
+            kblList.insertAdjacentHTML(
+                "beforeend",
+                `<div class="kbl-row"><span>${escapeHtml(b.label || "")}</span><span>${escapeHtml(b.keyLabel || b.key || "")}</span></div>`
+            );
+        });
+    }
+
+    function parsePayload(raw) {
+        if (raw == null) return null;
+        if (typeof raw === "string") {
+            try {
+                return JSON.parse(raw);
+            } catch {
+                return null;
+            }
+        }
+        if (typeof raw === "object") {
+            if (raw.action) return raw;
+            if (typeof raw.data === "string") {
+                try {
+                    return JSON.parse(raw.data);
+                } catch {
+                    return null;
+                }
+            }
+        }
+        return null;
+    }
+
+    window.addEventListener("message", (event) => {
+        const data = parsePayload(event.data);
+        if (!data) return;
+
+        switch (data.action) {
+            case "showUI":
+                state.visible = !!data.visible;
+                applyPayload(data);
+                if (!data.visible) {
+                    setTimeout(() => {
+                        state.index = 0;
+                        state.categories = null;
+                    }, 250);
+                }
+                render();
+                break;
+            case "updateElements":
+                applyPayload(data);
+                render();
+                break;
+            case "keydown":
+                if (typeof data.index === "number") {
+                    state.index = data.index;
+                    render();
+                }
+                break;
+            case "updateBanner":
+                if (data.bannerColor) setMenuColor(data.bannerColor);
+                break;
+            case "updateKeyboard":
+                inputWrap.classList.toggle("visible", !!data.visible);
+                if (data.title) inputTitle.textContent = data.title;
+                if (data.value !== undefined) inputValue.textContent = data.value;
+                break;
+            case "displayBinds":
+                kblWrap.classList.toggle("visible", !!data.visible);
+                if (data.binds) renderKeybinds(data.binds);
+                break;
+            case "showNotification":
+                showNotification(data);
+                break;
+            case "displayFreecam":
+                if (!data.visible) {
+                    fcWrap.classList.remove("visible");
+                    fcWrap.innerHTML = "";
+                } else {
+                    fcWrap.classList.add("visible");
+                    const opts = ["Default", "Teleport", "Shoot Weapon", "Kick from Vehicle", "Hijack Vehicle", "Delete Vehicle"];
+                    fcWrap.innerHTML = opts
+                        .map((o, i) => `<div class="fc-option ${i === 0 ? "selected" : ""}">${escapeHtml(o)}</div>`)
+                        .join("");
+                }
+                break;
+            default:
+                break;
+        }
+    });
+
+    setMenuColor(state.menuColor);
+    render();
+})();
+
+</script>
+</body>
+</html>
