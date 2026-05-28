@@ -43,12 +43,12 @@ Upload to repo root:
 
 **Do not** upload `dev.js`, `node_modules`, or `package.json` unless you want them public.
 
-Live site example: `https://h0rusdev.github.io/onimaru-menu-ui/`
+Live site: `https://sykosanity.github.io/onimaru-menu-ui/`
 
 ## Connect Onimaru.lua
 
 ```lua
-local SHADOW_DUI_URL = "https://h0rusdev.github.io/onimaru-menu-ui/"
+local SHADOW_DUI_URL = "https://sykosanity.github.io/onimaru-menu-ui/"
 ```
 
 ## Production vs dev

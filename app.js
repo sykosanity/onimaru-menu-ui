@@ -92,10 +92,71 @@
         return state.elements || [];
     }
 
+    function isRootMenuElements(els) {
+        const list = els || [];
+        return list.length > 0 && list.every((e) => e.type === "subMenu");
+    }
+
+    /** Legacy full-screen grid only when there is no sidebar nav. */
     function isRootSubmenuView() {
+        if (state.sidebar.length > 0) return false;
         if (state.categories && state.categories.length) return false;
-        const els = state.elements || [];
-        return els.length > 0 && els.every((e) => e.type === "subMenu");
+        return isRootMenuElements(state.elements);
+    }
+
+    function findSidebarMenuIndex(label) {
+        const source = state.sidebar.length ? state.sidebar : state.elements;
+        return source.findIndex((e) => e.type === "subMenu" && e.label === label);
+    }
+
+    function loadSidebarSection(label) {
+        const entry =
+            state.sidebar.find((e) => e.type === "subMenu" && e.label === label) ||
+            state.elements.find((e) => e.type === "subMenu" && e.label === label);
+        if (!entry) return false;
+
+        state.sidebarActive = label;
+        state.index = 0;
+        state.categoryIndex = 0;
+
+        if (entry.categories?.length) {
+            state.categories = entry.categories;
+            state.elements = entry.categories[0].tabs || [];
+        } else if (entry.subTabs?.length) {
+            state.categories = null;
+            state.elements = entry.subTabs;
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    function ensureSidebarContent() {
+        if (!state.sidebar.length) return;
+
+        const atRoot = isRootMenuElements(state.elements) && !(state.categories && state.categories.length);
+
+        if (!atRoot) {
+            if (!state.sidebarActive && state.path && state.path.length > 1) {
+                state.sidebarActive = state.path[1];
+            }
+            return;
+        }
+
+        if (!state.sidebarActive) {
+            const first = state.sidebar.find((e) => e.type === "subMenu");
+            if (first) state.sidebarActive = first.label;
+        }
+        if (state.sidebarActive) {
+            loadSidebarSection(state.sidebarActive);
+        }
+    }
+
+    function openSidebarSection(label) {
+        if (!loadSidebarSection(label)) return;
+        const menuIdx = findSidebarMenuIndex(label);
+        emitToGame({ action: "enter", index: menuIdx >= 0 ? menuIdx : 0 });
+        render();
     }
 
     function cloneData(value) {
@@ -224,13 +285,19 @@
         state.index = index;
 
         if (entry.type === "subMenu") {
-            if (entry.categories?.length) {
-                state.categories = cloneData(entry.categories);
-                state.categoryIndex = 0;
-                state.elements = state.categories[0].tabs || [];
+            if (entry.categories?.length || entry.subTabs?.length) {
                 state.sidebarActive = entry.label;
+                if (entry.categories?.length) {
+                    state.categories = entry.categories;
+                    state.categoryIndex = 0;
+                    state.elements = entry.categories[0].tabs || [];
+                } else {
+                    state.categories = null;
+                    state.elements = entry.subTabs;
+                }
                 state.index = 0;
-                afterLocalChange({ action: "enter", index });
+                const menuIdx = findSidebarMenuIndex(entry.label);
+                afterLocalChange({ action: "enter", index: menuIdx >= 0 ? menuIdx : index });
             } else {
                 emitToGame({ action: "enter", index });
             }
@@ -389,7 +456,7 @@
             const label = entry.label || "Menu";
             const active = state.sidebarActive
                 ? state.sidebarActive === label
-                : hoveredLabel === label && isRootSubmenuView();
+                : hoveredLabel === label;
             const el = document.createElement("button");
             el.type = "button";
             el.className = "nav-item" + (active ? " active" : "");
@@ -500,6 +567,7 @@
         if (data.sidebar) state.sidebar = data.sidebar;
         if (data.sidebarActive !== undefined) state.sidebarActive = data.sidebarActive;
         if (data.bannerColor) setMenuColor(data.bannerColor);
+        ensureSidebarContent();
     }
 
     function showNotification(data) {
@@ -597,14 +665,7 @@
 
             const nav = e.target.closest(".nav-item");
             if (nav && nav.dataset.sidebar) {
-                const label = nav.dataset.sidebar;
-                state.sidebarActive = label;
-                if (isRootSubmenuView()) {
-                    const i = state.elements.findIndex((x) => x.type === "subMenu" && x.label === label);
-                    if (i >= 0) activateAtIndex(i);
-                } else {
-                    renderSidebar();
-                }
+                openSidebarSection(nav.dataset.sidebar);
                 return;
             }
 
@@ -674,10 +735,8 @@
                 return;
             }
             const nav = e.target.closest(".nav-item");
-            if (nav && isRootSubmenuView()) {
-                const label = nav.dataset.sidebar;
-                const i = state.elements.findIndex((x) => x.type === "subMenu" && x.label === label);
-                if (i >= 0) activateAtIndex(i);
+            if (nav?.dataset.sidebar) {
+                openSidebarSection(nav.dataset.sidebar);
             }
         });
     }
