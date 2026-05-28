@@ -5,7 +5,7 @@ Develop locally with **live reload**, deploy to **GitHub Pages** for Macho.
 ## Local dev (live update, no `?preview=1`)
 
 ```bash
-cd onimaru-ui
+cd onimaru-menu-ui
 npm install
 npm run dev
 ```

@@ -1,12 +1,24 @@
 /**
  * Local dev only — keyboard simulator + HUD.
- * Loaded automatically on localhost (see index.html).
+ * No-op on GitHub Pages / in-game DUI.
  */
 (function () {
+    const host = window.location.hostname;
+    if (host !== "localhost" && host !== "127.0.0.1") {
+        return;
+    }
+
     const UI = window.OnimaruUI;
-    if (!UI) return;
+    if (!UI) {
+        console.error("[Onimaru DEV] app.js did not load — check Network tab for 404s.");
+        return;
+    }
 
     document.body.classList.add("page-preview");
+
+    if (!UI.getState().visible) {
+        UI.preview();
+    }
 
     const badge = document.createElement("div");
     badge.id = "dev-badge";

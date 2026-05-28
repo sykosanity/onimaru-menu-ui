@@ -480,7 +480,7 @@
     };
 
     if (isLocalDevMode()) {
-        if (verifyAssetsLoaded()) runPreviewDemo();
+        runPreviewDemo();
     } else {
         render();
     }
