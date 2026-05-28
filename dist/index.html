@@ -3,11 +3,66 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Onimaru Menu</title>
-  <script type="module" crossorigin src="/onimaru-menu-ui/assets/index-DkmTtg6l.js"></script>
+    <title>Onimaru Menu</title>
   <link rel="stylesheet" crossorigin href="/onimaru-menu-ui/assets/index-5yIfGNZI.css">
 </head>
 <body>
-    <div id="root"></div>
+    <div id="root">
+        <div id="page-error">
+            <div>
+                <strong>Onimaru UI failed to load</strong>
+                <br />
+                <br />
+                Build failed, check console.
+            </div>
+        </div>
+
+        <div id="dashboard" class="dashboard">
+            <aside class="dash-sidebar">
+                <div class="dash-brand">
+                    <span class="brand-mark"></span>
+                    <span id="brand" class="brand-text">onimaru</span>
+                </div>
+                <nav id="sidebar-nav" class="dash-nav"></nav>
+                <div class="dash-profile">
+                    <div class="profile-avatar"></div>
+                    <div class="profile-meta">
+                        <span id="profile-name" class="profile-name">Player</span>
+                        <span class="profile-badge">ACTIVE</span>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="dash-main">
+                <header class="dash-header">
+                    <nav id="tab-nav" class="dash-tabs"></nav>
+                    <div class="dash-header-right">
+                        <button id="extend-btn" type="button" class="tab-item dash-extend-btn">Extend</button>
+                    </div>
+                </header>
+                <div id="content" class="dash-content"></div>
+            </main>
+        </div>
+
+        <div id="desc-toast" class="desc-toast"></div>
+
+        <div id="input-wrapper" class="input-wrapper">
+            <div id="input-title" class="input-header">Input</div>
+            <div class="input-body">
+                <span id="input-value"></span>
+            </div>
+        </div>
+
+        <div id="kbl-wrapper" class="kbl-wrapper">
+            <div class="kbl-header"><span class="kbl-icon">⌨</span> Keybinds</div>
+            <div id="kbl-list" class="kbl-list"></div>
+        </div>
+
+        <div id="notifications" class="notifications"></div>
+        <div id="fc-wrapper" class="fc-wrapper"></div>
+    </div>
+
+    <script src="./app.js"></script>
+    <script src="./dev.js"></script>
 </body>
 </html>

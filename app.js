@@ -43,6 +43,8 @@
     const kblList = document.getElementById("kbl-list");
     const notifWrap = document.getElementById("notifications");
     const fcWrap = document.getElementById("fc-wrapper");
+    const extendBtn = document.getElementById("extend-btn");
+    let isExpanded = false;
 
     if (!dashboard || !sidebarNav || !contentEl) {
         document.body.classList.add("load-failed");
@@ -550,9 +552,14 @@
 
     function render() {
         dashboard.classList.toggle("visible", state.visible);
+        dashboard.classList.toggle("expanded", isExpanded);
+        dashboard.classList.toggle("docked", !isExpanded);
         document.body.classList.toggle("menu-open", state.visible);
         brandEl.textContent = (state.username || "onimaru").toLowerCase();
         profileName.textContent = state.username || "Player";
+        if (extendBtn) {
+            extendBtn.textContent = isExpanded ? "Dock Right" : "Extend";
+        }
         renderSidebar();
         renderTabs();
         renderContent();
@@ -899,6 +906,12 @@
     };
 
     bindInteractions();
+    if (extendBtn) {
+        extendBtn.addEventListener("click", () => {
+            isExpanded = !isExpanded;
+            render();
+        });
+    }
 
     if (isLocalDevMode()) {
         runPreviewDemo();
