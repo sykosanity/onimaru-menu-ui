@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { HashRouter, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { emitToGame } from "./bridge";
+import { buildMockShowUiPayload } from "./mockData";
 import type { BindItem, MenuCategory, MenuEntry, UiMessage, UiState } from "./types";
 
 const ICONS: Record<string, string> = {
@@ -39,6 +41,7 @@ const DEFAULT_STATE: UiState = {
 };
 
 type Notice = { id: number; type: string; title: string; desc: string };
+type Metric = { label: string; value: string };
 
 function isLocalDevMode(): boolean {
   const params = new URLSearchParams(window.location.search);
@@ -74,6 +77,18 @@ function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v));
 }
 
+function toRouteLabel(label = ""): string {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function toContractKey(...parts: Array<string | undefined>): string {
+  return parts
+    .filter(Boolean)
+    .map((p) => (p || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/(^_|_$)/g, ""))
+    .filter(Boolean)
+    .join(".");
+}
+
 function parsePayload(raw: unknown): UiMessage | null {
   if (raw == null) return null;
   if (typeof raw === "string") {
@@ -97,7 +112,90 @@ function parsePayload(raw: unknown): UiMessage | null {
   return null;
 }
 
-export default function App() {
+function sectionMetrics(section: string, tabs: MenuEntry[], selected?: MenuEntry): Metric[] {
+  const togglesOn = tabs.filter((t) => (t.type === "checkbox" || t.type === "scrollable-checkbox" || t.type === "slider-checkbox") && t.checked).length;
+  const sliders = tabs.filter((t) => t.type === "slider" || t.type === "slider-checkbox");
+  const avgSlider =
+    sliders.length > 0
+      ? (
+          sliders.reduce((acc, item) => {
+            const min = item.min ?? 0;
+            const max = item.max ?? 100;
+            const val = item.value ?? min;
+            const pct = max === min ? 0 : ((val - min) / (max - min)) * 100;
+            return acc + pct;
+          }, 0) / sliders.length
+        ).toFixed(0) + "%"
+      : "N/A";
+
+  const common: Metric[] = [
+    { label: "Section", value: section || "Overview" },
+    { label: "Enabled", value: `${togglesOn}` },
+    { label: "Slider Avg", value: avgSlider },
+    { label: "Selected", value: selected?.label || "None" },
+  ];
+
+  switch (section.toLowerCase()) {
+    case "self":
+      return [
+        { label: "Player State", value: togglesOn >= 2 ? "Enhanced" : "Normal" },
+        { label: "Protections", value: `${togglesOn}` },
+        { label: "Vitals", value: avgSlider },
+        { label: "Focus", value: selected?.label || "Movement" },
+      ];
+    case "server":
+      return [
+        { label: "Session Mode", value: selected?.type === "scrollable" ? "Profiled" : "Standard" },
+        { label: "Tasks", value: `${tabs.filter((t) => t.type === "button").length}` },
+        { label: "Live Toggles", value: `${togglesOn}` },
+        { label: "Focus", value: selected?.label || "Session" },
+      ];
+    case "weapon":
+      return [
+        { label: "Loadout", value: tabs.some((t) => t.label === "Primary") ? "Configured" : "Default" },
+        { label: "Modifiers", value: `${togglesOn}` },
+        { label: "Tuning", value: avgSlider },
+        { label: "Focus", value: selected?.label || "Weapon" },
+      ];
+    case "vehicle":
+      return [
+        { label: "Garage", value: tabs.some((t) => t.label === "Model") ? "Ready" : "Empty" },
+        { label: "Handling", value: avgSlider },
+        { label: "Safety", value: `${togglesOn}` },
+        { label: "Focus", value: selected?.label || "Vehicle" },
+      ];
+    case "teleports":
+      return [
+        { label: "Destinations", value: `${tabs.filter((t) => t.type === "scrollable").length}` },
+        { label: "Safety Flags", value: `${togglesOn}` },
+        { label: "Travel Mode", value: selected?.type === "button" ? "Execute" : "Select" },
+        { label: "Focus", value: selected?.label || "Location" },
+      ];
+    case "settings":
+      return [
+        { label: "Profile", value: "Mock Default" },
+        { label: "UI Toggles", value: `${togglesOn}` },
+        { label: "Scale/Tuning", value: avgSlider },
+        { label: "Focus", value: selected?.label || "Interface" },
+      ];
+    default:
+      return common;
+  }
+}
+
+declare global {
+  interface Window {
+    OnimaruUI?: {
+      send: (payload: UiMessage) => void;
+      preview: () => void;
+      getState: () => UiState;
+    };
+  }
+}
+
+function RoutedApp() {
+  const navigate = useNavigate();
+  const { section } = useParams();
   const [state, setState] = useState<UiState>(DEFAULT_STATE);
   const [notifications, setNotifications] = useState<Notice[]>([]);
   const nextNoticeId = useRef(1);
@@ -131,7 +229,26 @@ export default function App() {
     }, duration);
   };
 
-  const openSidebarSection = (label: string) => {
+  const emitUiContract = (type: string, payload: Record<string, unknown> = {}) => {
+    emitToGame({
+      action: "uiContract",
+      contract: {
+        type,
+        timestamp: Date.now(),
+        ...payload,
+      },
+    });
+  };
+
+  const runMockAction = (entry: MenuEntry) => {
+    if (entry.type !== "button") return;
+    showNotice("info", entry.label || "Action", "Mock action executed. Wire this label in Lua onSelect.", 1800);
+  };
+
+  const openSidebarSection = (label: string, opts?: { emit?: boolean; route?: boolean; replace?: boolean }) => {
+    const emit = opts?.emit !== false;
+    const route = opts?.route !== false;
+    const replace = opts?.replace === true;
     const entry = findSidebarEntry(label);
     if (!entry) return;
     const sidebarIndex = state.sidebar.findIndex((e) => e.type === "subMenu" && e.label === label);
@@ -148,13 +265,33 @@ export default function App() {
       return next;
     });
 
-    emitToGame({ action: "openSidebar", label, index: sidebarIndex >= 0 ? sidebarIndex : 0 });
+    if (emit) {
+      emitToGame({ action: "openSidebar", label, index: sidebarIndex >= 0 ? sidebarIndex : 0 });
+      emitUiContract("navigate.section", {
+        section: label,
+        key: toContractKey(label),
+        index: sidebarIndex >= 0 ? sidebarIndex : 0,
+      });
+    }
+    if (route) {
+      const target = `/${toRouteLabel(label)}`;
+      const current = section ? `/${section}` : "/";
+      if (current !== target) navigate(target, { replace });
+    }
   };
 
   const selectIndex = (index: number) => {
-    if (!activeTabs[index] || activeTabs[index].type === "divider") return;
+    const selected = activeTabs[index];
+    if (!selected || selected.type === "divider") return;
     setState((prev) => ({ ...prev, index }));
     emitToGame({ action: "select", index });
+    emitUiContract("select.item", {
+      section: state.sidebarActive,
+      category: state.categories?.[state.categoryIndex]?.label,
+      key: toContractKey(state.sidebarActive || "", state.categories?.[state.categoryIndex]?.label, selected.label),
+      label: selected.label,
+      index,
+    });
   };
 
   const activateAtIndex = (index: number) => {
@@ -179,13 +316,30 @@ export default function App() {
         return { ...prev, elements: nextTabs, index };
       });
       emitToGame({ action: "activate", index });
+      emitUiContract("toggle.item", {
+        section: state.sidebarActive,
+        category: state.categories?.[state.categoryIndex]?.label,
+        key: toContractKey(state.sidebarActive || "", state.categories?.[state.categoryIndex]?.label, entry.label),
+        label: entry.label,
+        checked: !entry.checked,
+        index,
+      });
       return;
     }
 
     setState((prev) => ({ ...prev, index }));
     emitToGame({ action: "activate", index });
+    if (entry.type === "button") {
+      emitUiContract("trigger.button", {
+        section: state.sidebarActive,
+        category: state.categories?.[state.categoryIndex]?.label,
+        key: toContractKey(state.sidebarActive || "", state.categories?.[state.categoryIndex]?.label, entry.label),
+        label: entry.label,
+        index,
+      });
+    }
     if (isLocalDevMode() && entry.type === "button") {
-      showNotice("success", entry.label || "Action", "Triggered (dev preview)", 2000);
+      runMockAction(entry);
     }
   };
 
@@ -198,6 +352,12 @@ export default function App() {
       index: 0,
     }));
     emitToGame({ action: "category", index });
+    emitUiContract("navigate.category", {
+      section: state.sidebarActive,
+      category: state.categories[index]?.label,
+      key: toContractKey(state.sidebarActive || "", state.categories[index]?.label),
+      index,
+    });
   };
 
   const adjustScrollable = (index: number, dir: -1 | 1) => {
@@ -218,6 +378,16 @@ export default function App() {
       return { ...prev, elements: nextTabs, index };
     });
     emitToGame({ action: "scroll", index, dir: dir < 0 ? "left" : "right" });
+    emitUiContract("set.value", {
+      section: state.sidebarActive,
+      category: state.categories?.[state.categoryIndex]?.label,
+      key: toContractKey(state.sidebarActive || "", state.categories?.[state.categoryIndex]?.label, tab.label),
+      label: tab.label,
+      kind: "scrollable",
+      value: nextValue,
+      valueLabel: tab.values?.[Math.max(0, nextValue - 1)] || "",
+      index,
+    });
   };
 
   const adjustSlider = (index: number, clientX: number, track: HTMLDivElement, commit: boolean) => {
@@ -243,7 +413,18 @@ export default function App() {
       return { ...prev, elements: nextTabs, index };
     });
 
-    if (commit) emitToGame({ action: "slider", index, value: clamped });
+    if (commit) {
+      emitToGame({ action: "slider", index, value: clamped });
+      emitUiContract("set.value", {
+        section: state.sidebarActive,
+        category: state.categories?.[state.categoryIndex]?.label,
+        key: toContractKey(state.sidebarActive || "", state.categories?.[state.categoryIndex]?.label, tab.label),
+        label: tab.label,
+        kind: "slider",
+        value: clamped,
+        index,
+      });
+    }
   };
 
   const processMessage = (data: UiMessage) => {
@@ -283,10 +464,16 @@ export default function App() {
         });
         break;
       case "keydown":
-        if (typeof data.index === "number") setState((prev) => ({ ...prev, index: data.index }));
+        if (typeof data.index === "number") {
+          const nextIndex = data.index;
+          setState((prev) => ({ ...prev, index: nextIndex }));
+        }
         break;
       case "updateBanner":
-        if (typeof data.bannerColor === "string") setState((prev) => ({ ...prev, menuColor: data.bannerColor }));
+        if (typeof data.bannerColor === "string") {
+          const nextColor = data.bannerColor;
+          setState((prev) => ({ ...prev, menuColor: nextColor }));
+        }
         break;
       case "updateKeyboard":
         setState((prev) => ({
@@ -324,37 +511,33 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    window.OnimaruUI = {
+      send: (payload: UiMessage) => processMessage(payload),
+      preview: () => processMessage(buildMockShowUiPayload()),
+      getState: () => clone(state),
+    };
+    return () => {
+      if (window.OnimaruUI) delete window.OnimaruUI;
+    };
+  }, [state]);
+
+  useEffect(() => {
+    if (!state.sidebar.length) return;
+    if (!section) {
+      const active = state.sidebarActive || state.sidebar.find((e) => e.type === "subMenu")?.label;
+      if (active) navigate(`/${toRouteLabel(active)}`, { replace: true });
+      return;
+    }
+    const matched = state.sidebar.find((e) => e.type === "subMenu" && toRouteLabel(e.label || "") === section);
+    if (matched?.label && matched.label !== state.sidebarActive) {
+      openSidebarSection(matched.label, { emit: false, route: false });
+    }
+  }, [section, state.sidebar, state.sidebarActive]);
+
+  useEffect(() => {
     if (!isLocalDevMode()) return;
     document.body.classList.add("page-preview");
-    processMessage({
-      action: "showUI",
-      visible: true,
-      username: "Onimaru",
-      path: ["Onimaru", "Self"],
-      sidebarActive: "Self",
-      sidebar: [
-        { type: "subMenu", label: "Self" },
-        { type: "subMenu", label: "Server" },
-        { type: "subMenu", label: "Weapon" },
-        { type: "subMenu", label: "Vehicle" },
-        { type: "subMenu", label: "Teleports" },
-        { type: "subMenu", label: "Settings" },
-      ],
-      categories: [
-        {
-          label: "Self",
-          tabs: [
-            { type: "divider", label: "Movement" },
-            { type: "checkbox", label: "Noclip", checked: true, desc: "Fly through walls" },
-            { type: "checkbox", label: "Freecam", checked: false },
-            { type: "checkbox", label: "Fast Run", checked: false },
-            { type: "slider", label: "Health", value: 200, min: 0, max: 200 },
-          ],
-        },
-        { label: "Combat", tabs: [{ type: "checkbox", label: "Infinite Ammo", checked: false }] },
-      ],
-      elements: [],
-    });
+    processMessage(buildMockShowUiPayload());
   }, []);
 
   const groupedSections = useMemo(() => {
@@ -368,6 +551,27 @@ export default function App() {
     });
     if (current.items.length) sections.push(current);
     return sections;
+  }, [activeTabs]);
+
+  const dashboardMetrics = useMemo(
+    () => sectionMetrics(state.sidebarActive || "", activeTabs, activeTabs[state.index]),
+    [state.sidebarActive, activeTabs, state.index]
+  );
+
+  const activityItems = useMemo(() => {
+    const top = activeTabs.slice(0, 8);
+    return top.map((entry) => {
+      if (entry.type === "slider" || entry.type === "slider-checkbox") {
+        return `${entry.label || "Slider"}: ${formatSliderValue(entry)}`;
+      }
+      if (entry.type === "checkbox" || entry.type === "scrollable-checkbox") {
+        return `${entry.label || "Toggle"}: ${entry.checked ? "ON" : "OFF"}`;
+      }
+      if (entry.type === "scrollable") {
+        return `${entry.label || "Option"}: ${scrollableLabel(entry)}`;
+      }
+      return entry.label || "Entry";
+    });
   }, [activeTabs]);
 
   return (
@@ -415,7 +619,18 @@ export default function App() {
           <header className="dash-header">
             <nav className="dash-tabs">
               {state.path.length > 1 && (
-                <button className="tab-item" type="button" onClick={() => emitToGame({ action: "back" })}>
+                <button
+                  className="tab-item"
+                  type="button"
+                  onClick={() => {
+                    emitToGame({ action: "back" });
+                    emitUiContract("navigate.back", {
+                      section: state.sidebarActive,
+                      category: state.categories?.[state.categoryIndex]?.label,
+                    });
+                    navigate(-1);
+                  }}
+                >
                   ← Back
                 </button>
               )}
@@ -430,68 +645,97 @@ export default function App() {
                 </button>
               ))}
             </nav>
-            <div className="dash-header-right">
-              <span className="dash-hint">↑↓ navigate · ←→ adjust · Enter select</span>
-            </div>
+            {/* <div className="dash-header-right"> */}
+              {/* <span className="dash-hint">↑↓ navigate · ←→ adjust · Enter select</span> */}
+            {/* </div> */}
           </header>
 
           <div className={`dash-content ${isRootSubmenuView ? "single-column" : ""}`}>
-            {isRootSubmenuView ? (
-              <div className="submenu-grid">
-                {state.elements
-                  .filter((e) => e.type === "subMenu")
-                  .map((entry) => (
-                    <button key={entry.label} className="submenu-card" type="button" onClick={() => entry.label && openSidebarSection(entry.label)}>
-                      <span className="nav-icon">{iconFor(entry.label)}</span>
-                      <span className="submenu-card-title">{entry.label}</span>
-                      <span className="sub-arrow" style={{ marginLeft: "auto" }}>
-                        ›
-                      </span>
-                    </button>
-                  ))}
-              </div>
-            ) : (
-              groupedSections.map((section) => (
-                <div key={section.title} className="section-card">
-                  <div className="section-title">{section.title}</div>
-                  <div className="section-rows">
-                    {section.items.map(({ entry, index }) => (
-                      <div key={`${entry.label}-${index}`} className={`feature-row ${index === state.index ? "active" : ""}`} onClick={() => selectIndex(index)}>
-                        <div className="feature-icon">{iconFor(entry.label)}</div>
-                        <div className="feature-body">
-                          <div className="feature-label">{entry.label}</div>
-                          {entry.desc ? <div className="feature-sub">{entry.desc}</div> : null}
-                        </div>
-                        <div className="feature-actions">
-                          {(entry.type === "scrollable" || entry.type === "scrollable-checkbox") && (
-                            <>
-                              <button type="button" className="scroll-ctrl" onClick={() => adjustScrollable(index, -1)}>
-                                ‹
-                              </button>
-                              <span className="scroll-value">{scrollableLabel(entry)}</span>
-                              <button type="button" className="scroll-ctrl" onClick={() => adjustScrollable(index, 1)}>
-                                ›
-                              </button>
-                            </>
-                          )}
-                          {(entry.type === "checkbox" || entry.type === "scrollable-checkbox" || entry.type === "slider-checkbox") && (
-                            <button type="button" className={`toggle ${entry.checked ? "on" : ""}`} onClick={() => activateAtIndex(index)} />
-                          )}
-                          {entry.type === "button" && (
-                            <button type="button" className="btn-pill" onClick={() => activateAtIndex(index)}>
-                              Run
-                            </button>
-                          )}
-                          {(entry.type === "slider" || entry.type === "slider-checkbox") && (
-                            <SliderControl entry={entry} onSet={(x, el, commit) => adjustSlider(index, x, el, commit)} />
-                          )}
-                        </div>
+            <section className="dash-page">
+              {isRootSubmenuView ? (
+                <div className="submenu-grid">
+                  {state.elements
+                    .filter((e) => e.type === "subMenu")
+                    .map((entry) => (
+                      <button key={entry.label} className="submenu-card" type="button" onClick={() => entry.label && openSidebarSection(entry.label)}>
+                        <span className="nav-icon">{iconFor(entry.label)}</span>
+                        <span className="submenu-card-title">{entry.label}</span>
+                        <span className="sub-arrow" style={{ marginLeft: "auto" }}>
+                          ›
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              ) : (
+                <div className="dashboard-layout">
+                  <div className="metric-row">
+                    {dashboardMetrics.map((m) => (
+                      <div key={m.label} className="metric-card">
+                        <span className="metric-label">{m.label}</span>
+                        <strong>{m.value}</strong>
                       </div>
                     ))}
                   </div>
+
+                  <div className="content-split">
+                    <div className="section-grid">
+                      {groupedSections.map((section) => (
+                        <div key={section.title} className="section-card">
+                          <div className="section-title">{section.title}</div>
+                          <div className="section-rows">
+                            {section.items.map(({ entry, index }) => (
+                              <div key={`${entry.label}-${index}`} className={`feature-row ${index === state.index ? "active" : ""}`} onClick={() => selectIndex(index)}>
+                                <div className="feature-icon">{iconFor(entry.label)}</div>
+                                <div className="feature-body">
+                                  <div className="feature-label">{entry.label}</div>
+                                  {entry.desc ? <div className="feature-sub">{entry.desc}</div> : null}
+                                </div>
+                                <div className="feature-actions">
+                                  {(entry.type === "scrollable" || entry.type === "scrollable-checkbox") && (
+                                    <>
+                                      <button type="button" className="scroll-ctrl" onClick={() => adjustScrollable(index, -1)}>
+                                        ‹
+                                      </button>
+                                      <span className="scroll-value">{scrollableLabel(entry)}</span>
+                                      <button type="button" className="scroll-ctrl" onClick={() => adjustScrollable(index, 1)}>
+                                        ›
+                                      </button>
+                                    </>
+                                  )}
+                                  {(entry.type === "checkbox" || entry.type === "scrollable-checkbox" || entry.type === "slider-checkbox") && (
+                                    <button type="button" className={`toggle ${entry.checked ? "on" : ""}`} onClick={() => activateAtIndex(index)} />
+                                  )}
+                                  {entry.type === "button" && (
+                                    <button type="button" className="btn-pill" onClick={() => activateAtIndex(index)}>
+                                      Run
+                                    </button>
+                                  )}
+                                  {(entry.type === "slider" || entry.type === "slider-checkbox") && (
+                                    <SliderControl entry={entry} onSet={(x, el, commit) => adjustSlider(index, x, el, commit)} />
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <aside className="activity-panel">
+                      <div className="section-title">Activity</div>
+                      <div className="activity-list">
+                        {activityItems.map((text, idx) => (
+                          <div key={`${text}-${idx}-activity`} className="activity-item">
+                            <span className="activity-dot" />
+                            <span>{text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </aside>
+                  </div>
                 </div>
-              ))
-            )}
+              )}
+            </section>
           </div>
         </main>
       </div>
@@ -593,5 +837,17 @@ function SliderControl({
       </div>
       <span className="slider-num">{formatSliderValue(entry)}</span>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <HashRouter>
+      <Routes>
+        <Route path="/" element={<RoutedApp />} />
+        <Route path="/:section" element={<RoutedApp />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </HashRouter>
   );
 }

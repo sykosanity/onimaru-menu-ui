@@ -4,6 +4,7 @@
     --bg-void: rgba(8, 6, 14, 0.55);
     --bg-shell: rgba(18, 14, 28, 0.92);
     --bg-sidebar: rgba(12, 10, 20, 0.95);
+    --bg-dash-main: rgb(12, 10, 20);
     --bg-card: rgba(28, 22, 42, 0.88);
     --bg-card-hover: rgba(36, 28, 54, 0.95);
     --bg-row-active: rgba(139, 92, 246, 0.14);
@@ -34,7 +35,7 @@ html, body {
 }
 
 body.page-preview {
-    background: radial-gradient(ellipse at 30% 20%, #1a1030 0%, #08060e 55%) !important;
+    /* background: radial-gradient(ellipse at 30% 20%, #1a1030 0%, #08060e 55%) !important; */
     cursor: default;
 }
 
@@ -67,9 +68,9 @@ body.menu-open {
     background: transparent;
     border: none;
     border-radius: var(--radius);
-    box-shadow: 0 0 40px rgba(var(--menu-rgb), 0.08);
-    backdrop-filter: blur(18px) saturate(1.2);
-    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.28s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
@@ -215,7 +216,8 @@ body.menu-open {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    background: transparent;
+    background: var(--bg-dash-main);
+    border-left: 1px solid rgba(var(--menu-rgb), 0.12);
 }
 
 .dash-header {
@@ -270,16 +272,117 @@ body.menu-open {
 .dash-content {
     flex: 1;
     overflow-y: auto;
-    padding: 16px 20px 20px;
+    /* padding: 16px 20px 20px; */
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    background: transparent;
+}
+
+.dash-content.single-column {
+    max-width: none;
+}
+
+.dash-page {
+    width: 100%;
+    min-height: 100%;
+    border-radius: 12px;
+    border: none;
+    /* background: rgba(20, 16, 32, 0.55); */
+    padding: 12px;
+}
+
+.section-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    width: 100%;
+    min-height: 100%;
+    grid-template-columns: 1fr;
     gap: 16px;
     align-content: start;
 }
 
-.dash-content.single-column {
-    grid-template-columns: 1fr;
-    max-width: 520px;
+.dashboard-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 100%;
+}
+
+.metric-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.metric-card {
+    background: rgba(17, 13, 30, 0.86);
+    border: 1px solid rgba(var(--menu-rgb), 0.2);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.metric-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.metric-card strong {
+    font-size: 14px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.content-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 240px;
+    gap: 14px;
+    flex: 1;
+    min-height: 0;
+}
+
+.activity-panel {
+    background: rgba(17, 13, 30, 0.86);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px;
+}
+
+.activity-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 7px 8px;
+    border-radius: 8px;
+}
+
+.activity-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+}
+
+.activity-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(var(--menu-rgb), 0.5);
 }
 
 /* ── Section cards ── */
@@ -288,6 +391,8 @@ body.menu-open {
     border: 1px solid var(--border-soft);
     border-radius: 12px;
     overflow: hidden;
+    width: 100%;
+    max-width: none;
 }
 
 .section-title {
