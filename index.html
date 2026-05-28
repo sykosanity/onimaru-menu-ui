@@ -4,72 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Onimaru Menu</title>
-    <script>
-        (function () {
-            var path = location.pathname || "/";
-            var base = path.substring(0, path.lastIndexOf("/") + 1);
-            if (base && base !== "/") {
-                var tag = document.createElement("base");
-                tag.href = base;
-                document.head.appendChild(tag);
-            }
-        })();
-    </script>
-    <link rel="stylesheet" href="shadow.css" />
 </head>
 <body>
-    <div id="page-error">
-        <div>
-            <strong>Onimaru UI failed to load</strong><br /><br />
-            Upload <code>index.html</code>, <code>shadow.css</code>, and <code>app.js</code> together.<br />
-            Browser test: <code>?preview=1</code>
-        </div>
-    </div>
-
-    <div id="root">
-        <div id="dashboard" class="dashboard">
-            <aside class="dash-sidebar">
-                <div class="dash-brand">
-                    <span class="brand-mark"></span>
-                    <span id="brand" class="brand-text">onimaru</span>
-                </div>
-                <nav id="sidebar-nav" class="dash-nav"></nav>
-                <div class="dash-profile">
-                    <div class="profile-avatar" id="profile-avatar"></div>
-                    <div class="profile-meta">
-                        <span id="profile-name" class="profile-name">Player</span>
-                        <span class="profile-badge">ACTIVE</span>
-                    </div>
-                </div>
-            </aside>
-
-            <main class="dash-main">
-                <header class="dash-header">
-                    <nav id="tab-nav" class="dash-tabs"></nav>
-                    <div class="dash-header-right">
-                        <span class="dash-hint">↑↓ navigate · ←→ adjust · Enter select</span>
-                    </div>
-                </header>
-                <div id="content" class="dash-content"></div>
-            </main>
-        </div>
-
-        <div id="desc-toast" class="desc-toast"></div>
-
-        <div id="input-wrapper" class="input-wrapper">
-            <div id="input-title" class="input-header">Input</div>
-            <div class="input-body"><span id="input-value"></span></div>
-        </div>
-
-        <div id="kbl-wrapper" class="kbl-wrapper">
-            <div class="kbl-header"><span class="kbl-icon">⌨</span> Keybinds</div>
-            <div id="kbl-list" class="kbl-list"></div>
-        </div>
-
-        <div id="notifications" class="notifications"></div>
-        <div id="fc-wrapper" class="fc-wrapper"></div>
-    </div>
-    <script src="app.js"></script>
-    <script src="dev.js"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>
