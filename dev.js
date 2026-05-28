@@ -23,7 +23,7 @@
     const badge = document.createElement("div");
     badge.id = "dev-badge";
     badge.innerHTML =
-        '<b>DEV</b> live reload · ↑↓ move · Q/E tabs · ←→ adjust · Enter · H hide · R reload demo';
+        '<b>DEV</b> click everything · dbl-click open · ↑↓ keys still work · H hide';
     document.body.appendChild(badge);
 
     function getTabs() {
@@ -185,26 +185,7 @@
                 break;
             case "Enter": {
                 e.preventDefault();
-                const s = UI.getState();
-                const list = getTabs();
-                const entry = list[s.index];
-                if (!entry) return;
-                if (entry.type === "checkbox" || entry.type === "slider-checkbox" || entry.type === "scrollable-checkbox") {
-                    const elements = list.map((x, i) =>
-                        i === s.index ? { ...x, checked: !x.checked } : { ...x }
-                    );
-                    UI.send({
-                        action: "updateElements",
-                        elements,
-                        categories: s.categories,
-                        categoryIndex: s.categoryIndex,
-                        index: s.index,
-                        sidebar: s.sidebar,
-                        sidebarActive: s.sidebarActive,
-                        path: s.path,
-                        username: s.username,
-                    });
-                }
+                UI.activateAtIndex(UI.getState().index);
                 break;
             }
             default:

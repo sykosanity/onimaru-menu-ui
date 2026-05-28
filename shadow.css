@@ -132,12 +132,17 @@ body.menu-open {
     display: flex;
     align-items: center;
     gap: 12px;
+    width: 100%;
     padding: 10px 12px;
+    border: none;
     border-radius: 10px;
     font-size: 13px;
     font-weight: 500;
+    font-family: inherit;
     color: var(--text-dim);
-    cursor: default;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
     transition: background 0.15s ease, color 0.15s ease;
 }
 
@@ -235,9 +240,12 @@ body.menu-open {
     padding: 8px 16px;
     font-size: 13px;
     font-weight: 500;
+    font-family: inherit;
     color: var(--text-dim);
+    background: transparent;
+    border: none;
     border-radius: 8px;
-    cursor: default;
+    cursor: pointer;
     transition: all 0.15s ease;
 }
 
@@ -306,7 +314,7 @@ body.menu-open {
     gap: 12px;
     padding: 10px 16px;
     min-height: 44px;
-    cursor: default;
+    cursor: pointer;
     transition: background 0.12s ease;
 }
 
@@ -385,10 +393,13 @@ body.menu-open {
 .toggle {
     width: 42px;
     height: 22px;
+    padding: 0;
+    border: none;
     border-radius: 22px;
     background: rgba(255, 255, 255, 0.1);
     position: relative;
     flex-shrink: 0;
+    cursor: pointer;
     transition: background 0.2s ease;
 }
 
@@ -425,6 +436,34 @@ body.menu-open {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    pointer-events: none;
+}
+
+.scroll-ctrl {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    font-family: inherit;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.35);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.scroll-ctrl:active {
+    transform: scale(0.92);
+}
+
+.scroll-ctrl:hover {
+    background: rgba(var(--menu-rgb), 0.25);
+    border-color: rgba(var(--menu-rgb), 0.45);
 }
 
 .slider-wrap {
@@ -436,11 +475,12 @@ body.menu-open {
 
 .slider-track {
     flex: 1;
-    height: 4px;
+    height: 8px;
     background: rgba(255, 255, 255, 0.08);
     border-radius: 4px;
     position: relative;
     min-width: 64px;
+    cursor: pointer;
 }
 
 .slider-fill {
@@ -480,10 +520,21 @@ body.menu-open {
     padding: 6px 14px;
     font-size: 12px;
     font-weight: 600;
+    font-family: inherit;
     border-radius: 8px;
     background: rgba(var(--menu-rgb), 0.2);
     border: 1px solid rgba(var(--menu-rgb), 0.35);
     color: var(--text);
+    cursor: pointer;
+    transition: background 0.12s ease, transform 0.1s ease;
+}
+
+.btn-pill:hover {
+    background: rgba(var(--menu-rgb), 0.35);
+}
+
+.btn-pill:active {
+    transform: scale(0.96);
 }
 
 /* Root submenu grid */
@@ -500,11 +551,15 @@ body.menu-open {
     border-radius: 12px;
     background: var(--bg-card);
     border: 1px solid var(--border-soft);
+    text-align: left;
     display: flex;
     align-items: center;
     gap: 14px;
+    width: 100%;
+    font-family: inherit;
+    color: inherit;
     transition: all 0.15s ease;
-    cursor: default;
+    cursor: pointer;
 }
 
 .submenu-card:hover {

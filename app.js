@@ -98,17 +98,218 @@
         return els.length > 0 && els.every((e) => e.type === "subMenu");
     }
 
+    function cloneData(value) {
+        return JSON.parse(JSON.stringify(value));
+    }
+
+    function mutateActiveTabs(mutator) {
+        if (state.categories && state.categories.length) {
+            const tabs = state.categories[state.categoryIndex].tabs;
+            if (tabs) mutator(tabs);
+            state.elements = tabs;
+        } else {
+            mutator(state.elements);
+        }
+    }
+
+    function pushUpdate() {
+        const payload = {
+            action: "updateElements",
+            elements: cloneData(state.elements),
+            categoryIndex: state.categoryIndex,
+            index: state.index,
+            sidebar: state.sidebar,
+            sidebarActive: state.sidebarActive,
+            path: state.path,
+            username: state.username,
+        };
+        if (state.categories) payload.categories = cloneData(state.categories);
+        processMessage(payload);
+    }
+
+    function selectIndex(index) {
+        const tabs = getActiveTabs();
+        if (!tabs.length) return;
+        if (tabs[index]?.type === "divider") return;
+        state.index = index;
+        emitToGame({ action: "select", index });
+        if (isLocalDevMode()) processMessage({ action: "keydown", index: state.index });
+        else render();
+    }
+
+    function rowActivatesOnClick(entry) {
+        if (!entry) return false;
+        const t = entry.type;
+        return (
+            t === "checkbox" ||
+            t === "button" ||
+            t === "slider-checkbox" ||
+            t === "scrollable-checkbox" ||
+            t === "scrollable"
+        );
+    }
+
+    function switchCategory(index) {
+        if (!state.categories || !state.categories.length) return;
+        state.categoryIndex = index;
+        state.elements = state.categories[index].tabs || [];
+        state.index = 0;
+        afterLocalChange({ action: "category", index });
+    }
+
+    function adjustScrollable(index, dir) {
+        mutateActiveTabs((tabs) => {
+            const tab = tabs[index];
+            if (!tab || !tab.values?.length) return;
+            tab.value = tab.value || 1;
+            const n = tab.values.length;
+            tab.value = dir < 0 ? tab.value - 1 : tab.value + 1;
+            if (tab.value < 1) tab.value = n;
+            if (tab.value > n) tab.value = 1;
+        });
+        state.index = index;
+        afterLocalChange({
+            action: "scroll",
+            index,
+            dir: dir < 0 ? "left" : "right",
+        });
+    }
+
+    function adjustSlider(index, clientX, trackEl, opts) {
+        const commit = !opts || opts.commit !== false;
+        mutateActiveTabs((tabs) => {
+            const tab = tabs[index];
+            if (!tab) return;
+            const min = tab.min ?? 0;
+            const max = tab.max ?? 100;
+            const rect = trackEl.getBoundingClientRect();
+            const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+            const step = tab.step || 1;
+            let val = min + pct * (max - min);
+            val = Math.round(val / step) * step;
+            tab.value = Math.max(min, Math.min(max, val));
+        });
+        state.index = index;
+        if (!commit) {
+            render();
+            return;
+        }
+        const tab = getActiveTabs()[index];
+        afterLocalChange({
+            action: "slider",
+            index,
+            value: tab?.value,
+        });
+    }
+
+    function toggleAtIndex(index) {
+        mutateActiveTabs((tabs) => {
+            const tab = tabs[index];
+            if (!tab) return;
+            if (tab.type === "checkbox" || tab.type === "slider-checkbox" || tab.type === "scrollable-checkbox") {
+                tab.checked = !tab.checked;
+            }
+        });
+        state.index = index;
+        afterLocalChange({ action: "activate", index });
+    }
+
+    function activateAtIndex(index) {
+        const list = state.categories?.length
+            ? state.categories[state.categoryIndex].tabs
+            : state.elements;
+        const entry = list?.[index];
+        if (!entry) return;
+
+        state.index = index;
+
+        if (entry.type === "subMenu") {
+            if (entry.categories?.length) {
+                state.categories = cloneData(entry.categories);
+                state.categoryIndex = 0;
+                state.elements = state.categories[0].tabs || [];
+                state.sidebarActive = entry.label;
+                state.index = 0;
+                afterLocalChange({ action: "enter", index });
+            } else {
+                emitToGame({ action: "enter", index });
+            }
+            return;
+        }
+
+        if (entry.type === "checkbox" || entry.type === "slider-checkbox" || entry.type === "scrollable-checkbox") {
+            toggleAtIndex(index);
+            return;
+        }
+
+        if (entry.type === "button") {
+            afterLocalChange({ action: "activate", index });
+            if (isLocalDevMode()) {
+                showNotification({
+                    type: "success",
+                    title: entry.label || "Action",
+                    desc: "Triggered (dev preview)",
+                    duration: 2000,
+                });
+            }
+            return;
+        }
+
+        afterLocalChange({ action: "activate", index });
+    }
+
+    function emitToGame(payload) {
+        const msg = { source: "onimaru-ui", ...payload };
+        const raw = JSON.stringify(msg);
+        let sent = false;
+
+        try {
+            if (typeof window.machoPost === "function") {
+                window.machoPost(raw);
+                sent = true;
+            }
+        } catch {
+            /* ignore */
+        }
+
+        try {
+            if (typeof window.invokeNative === "function") {
+                window.invokeNative("onimaruUi", raw);
+                sent = true;
+            }
+        } catch {
+            /* ignore */
+        }
+
+        try {
+            window.parent.postMessage(raw, "*");
+            sent = true;
+        } catch {
+            /* ignore */
+        }
+
+        return sent;
+    }
+
+    function afterLocalChange(gamePayload) {
+        emitToGame(gamePayload);
+        if (isLocalDevMode()) pushUpdate();
+        else render();
+    }
+
     function renderControl(entry) {
         const type = entry.type || "button";
         if (type === "checkbox" || type === "scrollable-checkbox" || type === "slider-checkbox") {
             const on = !!entry.checked;
             let extra = "";
             if (type === "scrollable-checkbox") {
-                extra = `<span class="scroll-value">${escapeHtml(scrollableLabel(entry))}</span>`;
+                extra = `<button type="button" class="scroll-ctrl" data-dir="left" title="Previous">‹</button>
+                    <span class="scroll-value">${escapeHtml(scrollableLabel(entry))}</span>
+                    <button type="button" class="scroll-ctrl" data-dir="right" title="Next">›</button>`;
             } else if (type === "slider-checkbox") {
                 extra = `<span class="slider-num">${formatSliderValue(entry)}</span>`;
             }
-            return `${extra}<div class="toggle ${on ? "on" : ""}" aria-hidden="true"></div>`;
+            return `${extra}<button type="button" class="toggle ${on ? "on" : ""}" aria-pressed="${on}"></button>`;
         }
         if (type === "slider") {
             const min = entry.min ?? 0;
@@ -116,7 +317,7 @@
             const val = entry.value ?? min;
             const pct = max === min ? 0 : ((val - min) / (max - min)) * 100;
             return `<div class="slider-wrap">
-                <div class="slider-track">
+                <div class="slider-track" role="slider" aria-valuenow="${val}" aria-valuemin="${min}" aria-valuemax="${max}">
                     <div class="slider-fill" style="width:${pct}%"></div>
                     <div class="slider-thumb" style="left:${pct}%"></div>
                 </div>
@@ -124,13 +325,15 @@
             </div>`;
         }
         if (type === "scrollable") {
-            return `<span class="scroll-value">${escapeHtml(scrollableLabel(entry))}</span>`;
+            return `<button type="button" class="scroll-ctrl" data-dir="left" title="Previous">‹</button>
+                <span class="scroll-value">${escapeHtml(scrollableLabel(entry))}</span>
+                <button type="button" class="scroll-ctrl" data-dir="right" title="Next">›</button>`;
         }
         if (type === "subMenu") {
             return `<span class="sub-arrow">›</span>`;
         }
         if (type === "button") {
-            return `<span class="btn-pill">Run</span>`;
+            return `<button type="button" class="btn-pill">Run</button>`;
         }
         return "";
     }
@@ -187,8 +390,10 @@
             const active = state.sidebarActive
                 ? state.sidebarActive === label
                 : hoveredLabel === label && isRootSubmenuView();
-            const el = document.createElement("div");
+            const el = document.createElement("button");
+            el.type = "button";
             el.className = "nav-item" + (active ? " active" : "");
+            el.dataset.sidebar = label;
             el.innerHTML = `<span class="nav-icon">${iconFor(label)}</span><span>${escapeHtml(label)}</span>`;
             sidebarNav.appendChild(el);
         });
@@ -202,6 +407,7 @@
             const el = document.createElement("button");
             el.type = "button";
             el.className = "tab-item" + (i === state.categoryIndex ? " active" : "");
+            el.dataset.tabIndex = String(i);
             el.textContent = cat.label || "Tab";
             tabNav.appendChild(el);
         });
@@ -217,8 +423,10 @@
             grid.className = "submenu-grid";
             state.elements.forEach((entry, i) => {
                 if (entry.type !== "subMenu") return;
-                const card = document.createElement("div");
+                const card = document.createElement("button");
+                card.type = "button";
                 card.className = "submenu-card" + (i === state.index ? " active" : "");
+                card.dataset.idx = String(i);
                 card.innerHTML = `<span class="nav-icon">${iconFor(entry.label)}</span>
                     <span class="submenu-card-title">${escapeHtml(entry.label || "")}</span>
                     <span class="sub-arrow" style="margin-left:auto">›</span>`;
@@ -337,6 +545,141 @@
             }
         }
         return null;
+    }
+
+    function bindInteractions() {
+        if (dashboard.dataset.bound === "1") return;
+        dashboard.dataset.bound = "1";
+
+        dashboard.addEventListener("click", (e) => {
+            if (!state.visible) return;
+
+            const toggle = e.target.closest(".toggle");
+            if (toggle) {
+                e.stopPropagation();
+                const row = toggle.closest(".feature-row");
+                if (row) toggleAtIndex(parseInt(row.dataset.idx, 10));
+                return;
+            }
+
+            const scrollCtrl = e.target.closest(".scroll-ctrl");
+            if (scrollCtrl) {
+                e.stopPropagation();
+                const row = scrollCtrl.closest(".feature-row");
+                if (!row) return;
+                const idx = parseInt(row.dataset.idx, 10);
+                adjustScrollable(idx, scrollCtrl.dataset.dir === "left" ? -1 : 1);
+                return;
+            }
+
+            const track = e.target.closest(".slider-track");
+            if (track) {
+                e.stopPropagation();
+                const row = track.closest(".feature-row");
+                if (!row) return;
+                adjustSlider(parseInt(row.dataset.idx, 10), e.clientX, track);
+                return;
+            }
+
+            const btnPill = e.target.closest(".btn-pill");
+            if (btnPill) {
+                e.stopPropagation();
+                const row = btnPill.closest(".feature-row");
+                if (row) activateAtIndex(parseInt(row.dataset.idx, 10));
+                return;
+            }
+
+            const tab = e.target.closest(".tab-item");
+            if (tab) {
+                switchCategory(parseInt(tab.dataset.tabIndex, 10));
+                return;
+            }
+
+            const nav = e.target.closest(".nav-item");
+            if (nav && nav.dataset.sidebar) {
+                const label = nav.dataset.sidebar;
+                state.sidebarActive = label;
+                if (isRootSubmenuView()) {
+                    const i = state.elements.findIndex((x) => x.type === "subMenu" && x.label === label);
+                    if (i >= 0) activateAtIndex(i);
+                } else {
+                    renderSidebar();
+                }
+                return;
+            }
+
+            const subCard = e.target.closest(".submenu-card");
+            if (subCard) {
+                activateAtIndex(parseInt(subCard.dataset.idx, 10));
+                return;
+            }
+
+            const row = e.target.closest(".feature-row");
+            if (row) {
+                const idx = parseInt(row.dataset.idx, 10);
+                const entry = getActiveTabs()[idx];
+                if (rowActivatesOnClick(entry)) {
+                    activateAtIndex(idx);
+                } else {
+                    selectIndex(idx);
+                }
+                return;
+            }
+        });
+
+        let sliderDrag = null;
+
+        dashboard.addEventListener("pointerdown", (e) => {
+            if (!state.visible) return;
+            const track = e.target.closest(".slider-track");
+            if (!track) return;
+            const row = track.closest(".feature-row");
+            if (!row) return;
+            e.preventDefault();
+            sliderDrag = { track, idx: parseInt(row.dataset.idx, 10) };
+            track.setPointerCapture(e.pointerId);
+            adjustSlider(sliderDrag.idx, e.clientX, track, { commit: false });
+        });
+
+        dashboard.addEventListener("pointermove", (e) => {
+            if (!sliderDrag) return;
+            adjustSlider(sliderDrag.idx, e.clientX, sliderDrag.track, { commit: false });
+        });
+
+        dashboard.addEventListener("pointerup", (e) => {
+            if (!sliderDrag) return;
+            adjustSlider(sliderDrag.idx, e.clientX, sliderDrag.track);
+            try {
+                sliderDrag.track.releasePointerCapture(e.pointerId);
+            } catch {
+                /* ignore */
+            }
+            sliderDrag = null;
+        });
+
+        dashboard.addEventListener("pointercancel", () => {
+            sliderDrag = null;
+        });
+
+        dashboard.addEventListener("dblclick", (e) => {
+            if (!state.visible) return;
+            const row = e.target.closest(".feature-row");
+            if (row) {
+                activateAtIndex(parseInt(row.dataset.idx, 10));
+                return;
+            }
+            const subCard = e.target.closest(".submenu-card");
+            if (subCard) {
+                activateAtIndex(parseInt(subCard.dataset.idx, 10));
+                return;
+            }
+            const nav = e.target.closest(".nav-item");
+            if (nav && isRootSubmenuView()) {
+                const label = nav.dataset.sidebar;
+                const i = state.elements.findIndex((x) => x.type === "subMenu" && x.label === label);
+                if (i >= 0) activateAtIndex(i);
+            }
+        });
     }
 
     window.addEventListener("message", (event) => {
@@ -475,9 +818,15 @@
     window.OnimaruUI = {
         send: processMessage,
         preview: runPreviewDemo,
-        getState: () => ({ ...state }),
+        getState: () => cloneData(state),
         render,
+        selectIndex,
+        switchCategory,
+        activateAtIndex,
+        toggleAtIndex,
     };
+
+    bindInteractions();
 
     if (isLocalDevMode()) {
         runPreviewDemo();
