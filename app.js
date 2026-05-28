@@ -155,7 +155,8 @@
     function openSidebarSection(label) {
         if (!loadSidebarSection(label)) return;
         const menuIdx = findSidebarMenuIndex(label);
-        emitToGame({ action: "enter", index: menuIdx >= 0 ? menuIdx : 0 });
+        state.path = ["Onimaru", label];
+        emitToGame({ action: "openSidebar", label, index: menuIdx >= 0 ? menuIdx : 0 });
         render();
     }
 
@@ -468,6 +469,14 @@
 
     function renderTabs() {
         tabNav.innerHTML = "";
+        if (state.path && state.path.length > 1) {
+            const back = document.createElement("button");
+            back.type = "button";
+            back.className = "tab-item";
+            back.dataset.uiAction = "back";
+            back.textContent = "← Back";
+            tabNav.appendChild(back);
+        }
         if (!state.categories || !state.categories.length) return;
 
         state.categories.forEach((cat, i) => {
@@ -659,6 +668,10 @@
 
             const tab = e.target.closest(".tab-item");
             if (tab) {
+                if (tab.dataset.uiAction === "back") {
+                    emitToGame({ action: "back" });
+                    return;
+                }
                 switchCategory(parseInt(tab.dataset.tabIndex, 10));
                 return;
             }
