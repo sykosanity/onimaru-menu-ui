@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { emitToGame } from "./bridge";
 import { buildMockShowUiPayload } from "./mockData";
+import { handleInjectedMouse, isInjectedMouseMessage } from "./mouseBridge";
 import type { BindItem, MenuCategory, MenuEntry, UiMessage, UiState } from "./types";
 
 const ICONS: Record<string, string> = {
@@ -517,6 +518,11 @@ function RoutedApp() {
         break;
       case "setCursor":
         setGameCursorOn(!!data.visible);
+        break;
+      case "mouse":
+        if (isInjectedMouseMessage(data)) {
+          handleInjectedMouse(data, (x, y) => setGameCursor({ x, y }));
+        }
         break;
       default:
         break;
