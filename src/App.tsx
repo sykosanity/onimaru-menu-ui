@@ -216,7 +216,7 @@ function RoutedApp() {
     return isRootMenuElements(state.elements);
   }, [state.sidebar.length, state.categories, state.elements]);
 
-  const useGameCursor = state.visible && !state.inputVisible && !isLocalDevMode() && gameCursorOn;
+  const useGameCursor = state.visible && !state.inputVisible && !isLocalDevMode();
   const keyboardPromptOpen = state.inputVisible && state.inputMode === "keybind";
 
   useEffect(() => {
@@ -228,7 +228,7 @@ function RoutedApp() {
   }, [state.menuColor, state.visible, useGameCursor, keyboardPromptOpen]);
 
   useEffect(() => {
-    if (!useGameCursor) return;
+    if (!isLocalDevMode() || !state.visible) return;
 
     const onMove = (event: MouseEvent) => {
       setGameCursor({ x: event.clientX, y: event.clientY });
@@ -236,7 +236,7 @@ function RoutedApp() {
 
     window.addEventListener("mousemove", onMove);
     return () => window.removeEventListener("mousemove", onMove);
-  }, [useGameCursor]);
+  }, [state.visible]);
 
   const findSidebarEntry = (label: string, s: UiState = state): MenuEntry | undefined => {
     return s.sidebar.find((e) => e.type === "subMenu" && e.label === label) || s.elements.find((e) => e.type === "subMenu" && e.label === label);
