@@ -1,8 +1,8 @@
 # Onimaru Menu UI
 
-Develop locally with **live reload**, deploy to **GitHub Pages** for Macho.
+React + TypeScript (Vite). Deploy **only the `dist/` folder** to GitHub Pages — not `app.js` / the old root HTML.
 
-## Local dev (live update, no `?preview=1`)
+## Local dev
 
 ```bash
 cd onimaru-menu-ui
@@ -10,56 +10,53 @@ npm install
 npm run dev
 ```
 
-Opens **http://localhost:5173** — menu shows automatically. Edit `shadow.css` / `app.js` / `index.html` and the browser **refreshes on save**.
+Open **http://localhost:5173/onimaru-menu-ui/** — the menu loads with mock data. Edit `src/` and `shadow.css`; Vite hot-reloads.
 
-### Dev controls (browser only)
+## Deploy to GitHub Pages (required for in-game DUI)
 
-| Key | Action |
-|-----|--------|
-| ↑ ↓ | Move selection |
-| Q / E | Switch category tabs |
-| ← → | Sliders / scrollables |
-| Enter | Toggle checkbox |
-| H | Show / hide menu |
-| R | Reset demo data |
+The live site must serve the **Vite build**, not the legacy `app.js` UI.
 
-Console API:
+### Option A — GitHub Actions (recommended)
 
-```js
-OnimaruDev.send({ action: "showUI", visible: true, elements: [...] })
-OnimaruDev.notify("Title", "Message")
+1. Push this repo to GitHub (`sykosanity/onimaru-menu-ui` or your fork).
+2. **Settings → Pages → Build and deployment → Source:** **GitHub Actions**.
+3. Push to `main` — workflow `.github/workflows/deploy-pages.yml` runs `npm run build` and publishes `dist/`.
+
+### Option B — Manual
+
+```bash
+npm run build
 ```
 
-`dev.js` is **not** uploaded to GitHub (optional). It only loads on `localhost` / `127.0.0.1`.
+Upload **everything inside `dist/`** to the branch GitHub Pages uses (often `main` root or `gh-pages` branch):
 
-## Deploy to GitHub Pages
+- `index.html` (references `/onimaru-menu-ui/assets/index-*.js` — **not** `app.js`)
+- `assets/` folder
+- `.nojekyll` (empty file at site root)
 
-Upload to repo root:
+Do **not** deploy root `app.js`, `dev.js`, or the old static `index.html` from before the React migration.
 
-- `index.html`
-- `shadow.css`
-- `app.js`
-- `.nojekyll`
+### Option C — gh-pages CLI
 
-**Do not** upload `dev.js`, `node_modules`, or `package.json` unless you want them public.
+```bash
+npm run deploy:pages
+```
 
-Live site: `https://sykosanity.github.io/onimaru-menu-ui/`
+Pushes `dist/` to the `gh-pages` branch. Set Pages source to that branch if you use this.
+
+Live URL: **https://sykosanity.github.io/onimaru-menu-ui/**
+
+After deploy, hard-refresh the URL in a browser. You should see the React dashboard, not “Onimaru UI failed to load” from the old static shell.
 
 ## Connect Onimaru.lua
 
 ```lua
-local SHADOW_DUI_URL = "https://sykosanity.github.io/onimaru-menu-ui/"
+local ONIMARU_DUI_URL = "https://sykosanity.github.io/onimaru-menu-ui/"
 ```
 
-## Production vs dev
-
-| | Local `npm run dev` | GitHub Pages | In-game |
-|--|---------------------|--------------|---------|
-| Menu visible | Always (demo) | Hidden until **H** | **H** to open |
-| `dev.js` | Yes | No | No |
-| Live reload | Yes | Push to update | — |
+`Onimaru.lua` already uses this URL. If the game still shows the old Shadow UI, GitHub Pages is still serving the legacy files — redeploy using the steps above.
 
 ## DUI messages
 
-- `showUI`, `updateElements`, `keydown`, `updateBanner`
-- `updateKeyboard`, `displayBinds`, `showNotification`, `displayFreecam`
+- **In:** `showUI`, `updateElements`, `keydown`, `updateBanner`, `updateKeyboard`, `displayBinds`, `showNotification`, `displayFreecam`
+- **Out:** `openSidebar`, `back`, `select`, `activate`, `category`, `scroll`, `slider`, `uiContract`
