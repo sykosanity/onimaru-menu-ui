@@ -3,6 +3,7 @@ import { HashRouter, Navigate, Route, Routes, useNavigate, useParams } from "rea
 import { emitToGame } from "./bridge";
 import { buildMockShowUiPayload } from "./mockData";
 import { handleInjectedMouse, isInjectedMouseMessage } from "./mouseBridge";
+import { installDuiMessageBridge, parseDuiPayload } from "./duiBridge";
 import type { BindItem, MenuCategory, MenuEntry, UiMessage, UiState } from "./types";
 
 const ICONS: Record<string, string> = {
@@ -537,12 +538,12 @@ function RoutedApp() {
   };
 
   useEffect(() => {
-    const onMessage = (ev: MessageEvent) => {
-      const parsed = parsePayload(ev.data);
-      if (parsed) processMessage(parsed);
+    installDuiMessageBridge((msg) => processMessage(msg));
+    return () => {
+      const w = window as Window & { onDuiMessage?: undefined; receiveDuiMessage?: undefined };
+      delete w.onDuiMessage;
+      delete w.receiveDuiMessage;
     };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
   }, []);
 
   useEffect(() => {
