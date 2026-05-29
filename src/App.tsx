@@ -198,6 +198,8 @@ function RoutedApp() {
   const { section } = useParams();
   const [state, setState] = useState<UiState>(DEFAULT_STATE);
   const [notifications, setNotifications] = useState<Notice[]>([]);
+  const [gameCursor, setGameCursor] = useState({ x: 0, y: 0 });
+  const [gameCursorOn, setGameCursorOn] = useState(false);
   const nextNoticeId = useRef(1);
 
   const activeTabs = useMemo(() => {
@@ -211,11 +213,25 @@ function RoutedApp() {
     return isRootMenuElements(state.elements);
   }, [state.sidebar.length, state.categories, state.elements]);
 
+  const useGameCursor = state.visible && !isLocalDevMode() && gameCursorOn;
+
   useEffect(() => {
     document.documentElement.style.setProperty("--menu-color", state.menuColor);
     document.documentElement.style.setProperty("--menu-rgb", state.menuColor);
     document.body.classList.toggle("menu-open", state.visible);
-  }, [state.menuColor, state.visible]);
+    document.body.classList.toggle("game-cursor", useGameCursor);
+  }, [state.menuColor, state.visible, useGameCursor]);
+
+  useEffect(() => {
+    if (!useGameCursor) return;
+
+    const onMove = (event: MouseEvent) => {
+      setGameCursor({ x: event.clientX, y: event.clientY });
+    };
+
+    window.addEventListener("mousemove", onMove);
+    return () => window.removeEventListener("mousemove", onMove);
+  }, [useGameCursor]);
 
   const findSidebarEntry = (label: string, s: UiState = state): MenuEntry | undefined => {
     return s.sidebar.find((e) => e.type === "subMenu" && e.label === label) || s.elements.find((e) => e.type === "subMenu" && e.label === label);
@@ -431,6 +447,9 @@ function RoutedApp() {
     switch (data.action) {
       case "showUI":
       case "updateElements":
+        if (data.action === "showUI" && typeof data.visible === "boolean" && !isLocalDevMode()) {
+          setGameCursorOn(data.visible);
+        }
         setState((prev) => {
           const next: UiState = { ...prev };
           if (typeof data.visible === "boolean") next.visible = data.visible;
@@ -495,6 +514,9 @@ function RoutedApp() {
         break;
       case "showNotification":
         showNotice(String(data.type || "info"), String(data.title || "Notice"), String(data.desc || data.message || ""));
+        break;
+      case "setCursor":
+        setGameCursorOn(!!data.visible);
         break;
       default:
         break;
@@ -576,6 +598,15 @@ function RoutedApp() {
 
   return (
     <>
+      {useGameCursor ? (
+        <div
+          id="game-cursor"
+          className="game-cursor"
+          style={{ left: `${gameCursor.x}px`, top: `${gameCursor.y}px` }}
+          aria-hidden
+        />
+      ) : null}
+
       <div id="page-error">
         <div>
           <strong>Onimaru UI failed to load</strong>

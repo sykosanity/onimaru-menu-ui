@@ -50,6 +50,27 @@ body.menu-open {
     cursor: default;
 }
 
+/* In-game: Lua enables focus; draw our own pointer when OS cursor is hidden */
+body.game-cursor,
+body.game-cursor * {
+    cursor: none !important;
+}
+
+#game-cursor {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.65), 0 0 12px rgba(139, 92, 246, 0.45);
+    pointer-events: none;
+    z-index: 100000;
+    transform: translate(-50%, -50%);
+}
+
 #root {
     width: 100%;
     height: 100%;
