@@ -47,6 +47,7 @@ export interface UiState {
   username: string;
   menuColor: string;
   inputVisible: boolean;
+  inputMode: "typeable" | "keybind";
   inputTitle: string;
   inputValue: string;
   keybindsVisible: boolean;

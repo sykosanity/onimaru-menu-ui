@@ -34,6 +34,7 @@ const DEFAULT_STATE: UiState = {
   username: "Onimaru",
   menuColor: "139, 92, 246",
   inputVisible: false,
+  inputMode: "typeable",
   inputTitle: "Input",
   inputValue: "",
   keybindsVisible: false,
@@ -214,14 +215,16 @@ function RoutedApp() {
     return isRootMenuElements(state.elements);
   }, [state.sidebar.length, state.categories, state.elements]);
 
-  const useGameCursor = state.visible && !isLocalDevMode() && gameCursorOn;
+  const useGameCursor = state.visible && !state.inputVisible && !isLocalDevMode() && gameCursorOn;
+  const keyboardPromptOpen = state.inputVisible && state.inputMode === "keybind";
 
   useEffect(() => {
     document.documentElement.style.setProperty("--menu-color", state.menuColor);
     document.documentElement.style.setProperty("--menu-rgb", state.menuColor);
     document.body.classList.toggle("menu-open", state.visible);
     document.body.classList.toggle("game-cursor", useGameCursor);
-  }, [state.menuColor, state.visible, useGameCursor]);
+    document.body.classList.toggle("keyboard-prompt", keyboardPromptOpen);
+  }, [state.menuColor, state.visible, useGameCursor, keyboardPromptOpen]);
 
   useEffect(() => {
     if (!useGameCursor) return;
@@ -499,9 +502,13 @@ function RoutedApp() {
         setState((prev) => ({
           ...prev,
           inputVisible: !!data.visible,
+          inputMode: data.mode === "keybind" || data.mode === "typeable" ? data.mode : prev.inputMode,
           inputTitle: typeof data.title === "string" ? data.title : prev.inputTitle,
           inputValue: data.value !== undefined ? String(data.value) : prev.inputValue,
         }));
+        if (!data.visible) {
+          setGameCursorOn(false);
+        }
         break;
       case "displayBinds":
         setState((prev) => ({
@@ -779,10 +786,21 @@ function RoutedApp() {
 
       <div className={`desc-toast ${activeTabs[state.index]?.desc && state.visible ? "visible" : ""}`}>{activeTabs[state.index]?.desc || ""}</div>
 
-      <div className={`input-wrapper ${state.inputVisible ? "visible" : ""}`}>
+      {keyboardPromptOpen ? <div className="keyboard-backdrop" aria-hidden /> : null}
+
+      <div
+        className={`input-wrapper ${state.inputVisible ? "visible" : ""} ${state.inputMode === "keybind" ? "input-keybind" : ""}`}
+      >
         <div className="input-header">{state.inputTitle}</div>
         <div className="input-body">
-          <span>{state.inputValue}</span>
+          {state.inputMode === "keybind" ? (
+            <>
+              <p className="input-hint">Press any key on your keyboard to set the menu open key.</p>
+              <div className="input-key-display">{state.inputValue || "Waiting for key…"}</div>
+            </>
+          ) : (
+            <span>{state.inputValue}</span>
+          )}
         </div>
       </div>
 

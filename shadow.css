@@ -763,6 +763,54 @@ body.load-failed #page-error {
     display: block;
 }
 
+.keyboard-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 4, 12, 0.72);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 150;
+    pointer-events: none;
+}
+
+body.keyboard-prompt .input-wrapper.input-keybind {
+    display: block;
+    left: 50%;
+    top: 50%;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+    width: min(440px, 90vw);
+    z-index: 250;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--border);
+}
+
+body.keyboard-prompt .input-wrapper.input-keybind .input-header {
+    font-size: 15px;
+    text-align: center;
+    background: rgba(139, 92, 246, 0.12);
+}
+
+.input-hint {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+}
+
+.input-key-display {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-align: center;
+    color: var(--accent);
+    padding: 12px 0 4px;
+    min-height: 44px;
+}
+
+body.keyboard-prompt .input-keybind .input-body span::after {
+    display: none;
+}
+
 .input-header {
     padding: 12px 16px;
     font-size: 13px;
