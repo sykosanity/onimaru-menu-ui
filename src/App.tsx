@@ -220,6 +220,14 @@ function RoutedApp() {
   const keyboardPromptOpen = state.inputVisible && state.inputMode === "keybind";
 
   useEffect(() => {
+    if (!state.visible) return;
+    requestAnimationFrame(() => {
+      document.querySelector(".feature-row.active")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      document.querySelector(".nav-item.active")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  }, [state.index, state.visible, state.categoryIndex, state.sidebarActive]);
+
+  useEffect(() => {
     document.documentElement.style.setProperty("--menu-color", state.menuColor);
     document.documentElement.style.setProperty("--menu-rgb", state.menuColor);
     document.body.classList.toggle("menu-open", state.visible);
