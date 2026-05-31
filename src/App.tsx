@@ -333,10 +333,11 @@ function RoutedApp() {
     }
 
     if (entry.type === "checkbox" || entry.type === "scrollable-checkbox" || entry.type === "slider-checkbox") {
+      const newChecked = !entry.checked;
       setState((prev) => {
         const nextTabs = clone(activeTabs);
         const current = nextTabs[index];
-        current.checked = !current.checked;
+        current.checked = newChecked;
         if (prev.categories?.length) {
           const categories = clone(prev.categories);
           categories[prev.categoryIndex] = { ...categories[prev.categoryIndex], tabs: nextTabs };
@@ -344,13 +345,13 @@ function RoutedApp() {
         }
         return { ...prev, elements: nextTabs, index };
       });
-      emitToGame({ action: "activate", index });
+      emitToGame({ action: "activate", index, checked: newChecked });
       emitUiContract("toggle.item", {
         section: state.sidebarActive,
         category: state.categories?.[state.categoryIndex]?.label,
         key: toContractKey(state.sidebarActive || "", state.categories?.[state.categoryIndex]?.label, entry.label),
         label: entry.label,
-        checked: !entry.checked,
+        checked: newChecked,
         index,
       });
       return;
@@ -406,7 +407,7 @@ function RoutedApp() {
       }
       return { ...prev, elements: nextTabs, index };
     });
-    emitToGame({ action: "scroll", index, dir: dir < 0 ? "left" : "right" });
+    emitToGame({ action: "scroll", index, dir: dir < 0 ? "left" : "right", value: nextValue });
     emitUiContract("set.value", {
       section: state.sidebarActive,
       category: state.categories?.[state.categoryIndex]?.label,

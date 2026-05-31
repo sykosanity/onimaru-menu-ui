@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "extract-mock": "node scripts/extractMockMenu.mjs",
     "build": "vite build",
     "preview": "vite preview --port 5173",
     "deploy:pages": "npm run build && npx --yes gh-pages -d dist -t true"

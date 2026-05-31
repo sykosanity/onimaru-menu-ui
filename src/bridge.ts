@@ -4,6 +4,7 @@ declare global {
   interface Window {
     machoPost?: (payload: string) => void;
     invokeNative?: (name: string, payload: string) => void;
+    cfx?: { postMessage?: (payload: string) => void };
   }
 }
 
@@ -12,23 +13,20 @@ export function emitToGame(payload: Omit<UiOutMessage, "source">): boolean {
   const raw = JSON.stringify(msg);
   let sent = false;
 
-  try {
-    if (typeof window.machoPost === "function") {
-      window.machoPost(raw);
+  const trySend = (fn: (() => void) | undefined) => {
+    if (typeof fn !== "function") return;
+    try {
+      fn();
       sent = true;
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
-  }
+  };
 
-  try {
-    if (typeof window.invokeNative === "function") {
-      window.invokeNative("onimaruUi", raw);
-      sent = true;
-    }
-  } catch {
-    // ignore
-  }
+  trySend(() => window.machoPost?.(raw));
+  trySend(() => window.invokeNative?.("onimaruUi", raw));
+  trySend(() => window.invokeNative?.("duiCallback", raw));
+  trySend(() => window.cfx?.postMessage?.(raw));
 
   try {
     window.parent.postMessage(raw, "*");
