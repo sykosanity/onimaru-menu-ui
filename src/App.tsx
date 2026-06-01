@@ -682,6 +682,7 @@ function RoutedApp() {
                   type="button"
                   key={entry.label}
                   className={`nav-item ${state.sidebarActive === entry.label ? "active" : ""}`}
+                  data-label={entry.label}
                   onClick={() => entry.label && openSidebarSection(entry.label)}
                 >
                   <span className="nav-icon">{iconFor(entry.label)}</span>
@@ -722,6 +723,7 @@ function RoutedApp() {
                   key={`${cat.label}-${i}`}
                   className={`tab-item ${i === state.categoryIndex ? "active" : ""}`}
                   type="button"
+                  data-index={i}
                   onClick={() => switchCategory(i)}
                 >
                   {cat.label || "Tab"}
@@ -746,6 +748,7 @@ function RoutedApp() {
                         className={`submenu-card ${index === state.index ? "active" : ""}`}
                         type="button"
                         data-index={index}
+                        data-label={entry.label}
                         onClick={() => entry.label && openSidebarSection(entry.label)}
                       >
                         <span className="nav-icon">{iconFor(entry.label)}</span>

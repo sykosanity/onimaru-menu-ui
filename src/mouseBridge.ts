@@ -1,5 +1,8 @@
 /** Macho DUI often does not deliver real DOM mouse events; Lua injects normalized coords instead. */
 
+import { clickHitToGamePayload, resolveClickAt } from "./clickResolve";
+import { emitToGame } from "./bridge";
+
 const INTERACTIVE =
   "button, .nav-item, .tab-item, .feature-row, .submenu-card, .dash-card, .scroll-ctrl, .toggle, .btn-pill, .slider-track, .dash-extend-btn";
 
@@ -46,6 +49,23 @@ function scrollAtPoint(x: number, y: number, delta: number) {
   }
 }
 
+let lastDownPoint: { x: number; y: number } | null = null;
+
+function dispatchResolvedClick(x: number, y: number) {
+  const hit = resolveClickAt(x, y);
+  if (!hit) return;
+  emitToGame(clickHitToGamePayload(hit) as Parameters<typeof emitToGame>[0]);
+
+  const dashboard = document.getElementById("dashboard");
+  if (!dashboard?.classList.contains("visible")) return;
+
+  const el = document.elementFromPoint(x, y);
+  const target = el?.closest(INTERACTIVE);
+  if (target instanceof HTMLElement) {
+    target.click();
+  }
+}
+
 export function handleInjectedMouse(
   data: InjectedMouseMessage,
   onMove: (x: number, y: number) => void
@@ -78,18 +98,22 @@ export function handleInjectedMouse(
   const opts: MouseEventInit = { bubbles: true, cancelable: true, clientX: x, clientY: y, view: window };
 
   if (data.type === "down") {
+    lastDownPoint = { x, y };
     target.dispatchEvent(new MouseEvent("mousedown", opts));
     return true;
   }
 
   if (data.type === "up") {
     target.dispatchEvent(new MouseEvent("mouseup", opts));
+    if (lastDownPoint) {
+      dispatchResolvedClick(lastDownPoint.x, lastDownPoint.y);
+    }
+    lastDownPoint = null;
     return true;
   }
 
   if (data.type === "click") {
-    // Visual feedback only — Lua HandleGameClick runs the real onSelect handlers.
-    target.click();
+    dispatchResolvedClick(x, y);
     return true;
   }
 
