@@ -254,12 +254,21 @@ body.menu-open #game-cursor {
     padding: 14px 20px 0;
     gap: 16px;
     flex-shrink: 0;
+    min-width: 0;
 }
 
 .dash-tabs {
     display: flex;
     gap: 4px;
-    flex-wrap: wrap;
+    flex: 1;
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
 }
 
 .tab-item {
@@ -273,6 +282,8 @@ body.menu-open #game-cursor {
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.15s ease;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .tab-item:hover {
@@ -324,7 +335,7 @@ body.menu-open #game-cursor {
 .section-grid {
     display: grid;
     width: 100%;
-    min-height: 100%;
+    min-height: 0;
     grid-template-columns: 1fr;
     gap: 16px;
     align-content: start;
@@ -334,7 +345,7 @@ body.menu-open #game-cursor {
     display: flex;
     flex-direction: column;
     gap: 14px;
-    min-height: 100%;
+    min-height: min-content;
 }
 
 .metric-row {
@@ -374,6 +385,7 @@ body.menu-open #game-cursor {
     gap: 14px;
     flex: 1;
     min-height: 0;
+    align-items: start;
 }
 
 .activity-panel {
@@ -381,6 +393,10 @@ body.menu-open #game-cursor {
     border: 1px solid var(--border-soft);
     border-radius: 12px;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    max-height: 100%;
 }
 
 .activity-list {
@@ -388,6 +404,11 @@ body.menu-open #game-cursor {
     flex-direction: column;
     gap: 2px;
     padding: 8px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
 }
 
 .activity-item {
@@ -418,7 +439,7 @@ body.menu-open #game-cursor {
     background: var(--bg-card);
     border: 1px solid var(--border-soft);
     border-radius: 12px;
-    overflow: hidden;
+    overflow: visible;
     width: 100%;
     max-width: none;
 }
@@ -966,12 +987,17 @@ body.keyboard-prompt .input-keybind .input-body span::after {
 }
 
 .dash-content::-webkit-scrollbar,
-.dash-nav::-webkit-scrollbar {
+.dash-nav::-webkit-scrollbar,
+.dash-tabs::-webkit-scrollbar,
+.activity-list::-webkit-scrollbar {
     width: 5px;
+    height: 5px;
 }
 
 .dash-content::-webkit-scrollbar-thumb,
-.dash-nav::-webkit-scrollbar-thumb {
+.dash-nav::-webkit-scrollbar-thumb,
+.dash-tabs::-webkit-scrollbar-thumb,
+.activity-list::-webkit-scrollbar-thumb {
     background: rgba(var(--menu-rgb), 0.35);
     border-radius: 4px;
 }

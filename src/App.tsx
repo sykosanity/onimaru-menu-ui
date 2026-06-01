@@ -58,6 +58,13 @@ function isGameMode(): boolean {
   return !isLocalDevMode();
 }
 
+function scrollActiveMenuItem() {
+  const selectors = [".feature-row.active", ".nav-item.active", ".tab-item.active", ".submenu-card.active"];
+  for (const selector of selectors) {
+    document.querySelector(selector)?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  }
+}
+
 function iconFor(label = ""): string {
   const key = label.toLowerCase().replace(/[^a-z]/g, "");
   for (const k of Object.keys(ICONS)) {
@@ -227,9 +234,14 @@ function RoutedApp() {
   useEffect(() => {
     if (!state.visible) return;
     requestAnimationFrame(() => {
-      document.querySelector(".feature-row.active")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      document.querySelector(".nav-item.active")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      document.querySelector(".dash-content")?.scrollTo({ top: 0, behavior: "auto" });
+      scrollActiveMenuItem();
     });
+  }, [state.sidebarActive, state.categoryIndex, state.visible]);
+
+  useEffect(() => {
+    if (!state.visible) return;
+    requestAnimationFrame(() => scrollActiveMenuItem());
   }, [state.index, state.visible, state.categoryIndex, state.sidebarActive]);
 
   useEffect(() => {
@@ -724,9 +736,16 @@ function RoutedApp() {
               {isRootSubmenuView ? (
                 <div className="submenu-grid">
                   {state.elements
-                    .filter((e) => e.type === "subMenu")
-                    .map((entry) => (
-                      <button key={entry.label} className="submenu-card" type="button" onClick={() => entry.label && openSidebarSection(entry.label)}>
+                    .map((entry, index) => ({ entry, index }))
+                    .filter(({ entry }) => entry.type === "subMenu")
+                    .map(({ entry, index }) => (
+                      <button
+                        key={entry.label}
+                        className={`submenu-card ${index === state.index ? "active" : ""}`}
+                        type="button"
+                        data-index={index}
+                        onClick={() => entry.label && openSidebarSection(entry.label)}
+                      >
                         <span className="nav-icon">{iconFor(entry.label)}</span>
                         <span className="submenu-card-title">{entry.label}</span>
                         <span className="sub-arrow" style={{ marginLeft: "auto" }}>

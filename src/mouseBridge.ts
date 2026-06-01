@@ -3,7 +3,8 @@
 const INTERACTIVE =
   "button, .nav-item, .tab-item, .feature-row, .submenu-card, .dash-card, .scroll-ctrl, .toggle, .btn-pill, .slider-track, .dash-extend-btn";
 
-const SCROLLABLE = ".dash-content, .dash-nav, .section-rows, .activity-list, .section-grid";
+const SCROLLABLE =
+  ".dash-content, .dash-nav, .dash-tabs, .section-rows, .activity-list, .section-grid, .submenu-grid";
 
 export type InjectedMouseType = "move" | "down" | "up" | "click" | "wheel";
 
@@ -37,8 +38,12 @@ function scrollAtPoint(x: number, y: number, delta: number) {
   const hit = document.elementFromPoint(x, y);
   const scroller = findScrollableParent(hit);
   if (!scroller) return;
-  const step = Math.max(32, Math.min(120, scroller.clientHeight * 0.15));
-  scroller.scrollTop += delta > 0 ? step : -step;
+  const step = Math.max(32, Math.min(120, Math.max(scroller.clientHeight, scroller.clientWidth) * 0.15));
+  if (scroller.scrollHeight > scroller.clientHeight + 1) {
+    scroller.scrollTop += delta > 0 ? step : -step;
+  } else if (scroller.scrollWidth > scroller.clientWidth + 1) {
+    scroller.scrollLeft += delta > 0 ? step : -step;
+  }
 }
 
 export function handleInjectedMouse(
