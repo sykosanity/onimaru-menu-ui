@@ -4,6 +4,7 @@ import { emitToGame } from "./bridge";
 import { buildMockShowUiPayload } from "./mockData";
 import { handleInjectedMouse, isInjectedMouseMessage } from "./mouseBridge";
 import { installDuiMessageBridge, parseDuiPayload } from "./duiBridge";
+import { installOutboundBridge } from "./bridge";
 import type { BindItem, MenuCategory, MenuEntry, UiMessage, UiState } from "./types";
 
 const ICONS: Record<string, string> = {
@@ -469,8 +470,13 @@ function RoutedApp() {
           if (typeof data.visible === "boolean") next.visible = data.visible;
           if (Array.isArray(data.elements)) next.elements = clone(data.elements as MenuEntry[]);
           if (typeof data.index === "number") next.index = data.index;
-          if (Array.isArray(data.categories)) next.categories = clone(data.categories as MenuCategory[]);
-          else if (data.action === "showUI") next.categories = null;
+          if (Array.isArray(data.categories)) {
+            next.categories = clone(data.categories as MenuCategory[]);
+            if (Array.isArray(data.elements) && next.categories.length && typeof data.categoryIndex === "number") {
+              const ci = Math.max(0, Math.min(next.categories.length - 1, data.categoryIndex));
+              next.categories[ci] = { ...next.categories[ci], tabs: clone(data.elements as MenuEntry[]) };
+            }
+          } else if (data.action === "showUI") next.categories = null;
           if (typeof data.categoryIndex === "number") next.categoryIndex = data.categoryIndex;
           if (Array.isArray(data.path)) next.path = data.path as string[];
           if (Array.isArray(data.sidebar)) next.sidebar = clone(data.sidebar as MenuEntry[]);
@@ -547,6 +553,7 @@ function RoutedApp() {
   };
 
   useEffect(() => {
+    installOutboundBridge();
     installDuiMessageBridge((msg) => processMessage(msg));
     return () => {
       const w = window as Window & { onDuiMessage?: undefined; receiveDuiMessage?: undefined };
@@ -744,23 +751,23 @@ function RoutedApp() {
                                   <div className="feature-label">{entry.label}</div>
                                   {entry.desc ? <div className="feature-sub">{entry.desc}</div> : null}
                                 </div>
-                                <div className="feature-actions">
+                                <div className="feature-actions" onClick={(e) => e.stopPropagation()}>
                                   {(entry.type === "scrollable" || entry.type === "scrollable-checkbox") && (
                                     <>
-                                      <button type="button" className="scroll-ctrl" onClick={() => adjustScrollable(index, -1)}>
+                                      <button type="button" className="scroll-ctrl" onClick={(e) => { e.stopPropagation(); adjustScrollable(index, -1); }}>
                                         ‹
                                       </button>
                                       <span className="scroll-value">{scrollableLabel(entry)}</span>
-                                      <button type="button" className="scroll-ctrl" onClick={() => adjustScrollable(index, 1)}>
+                                      <button type="button" className="scroll-ctrl" onClick={(e) => { e.stopPropagation(); adjustScrollable(index, 1); }}>
                                         ›
                                       </button>
                                     </>
                                   )}
                                   {(entry.type === "checkbox" || entry.type === "scrollable-checkbox" || entry.type === "slider-checkbox") && (
-                                    <button type="button" className={`toggle ${entry.checked ? "on" : ""}`} onClick={() => activateAtIndex(index)} />
+                                    <button type="button" className={`toggle ${entry.checked ? "on" : ""}`} onClick={(e) => { e.stopPropagation(); activateAtIndex(index); }} />
                                   )}
                                   {entry.type === "button" && (
-                                    <button type="button" className="btn-pill" onClick={() => activateAtIndex(index)}>
+                                    <button type="button" className="btn-pill" onClick={(e) => { e.stopPropagation(); activateAtIndex(index); }}>
                                       Run
                                     </button>
                                   )}
