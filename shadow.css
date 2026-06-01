@@ -801,6 +801,14 @@ body.load-failed #page-error {
     pointer-events: none;
 }
 
+body.keybind-boot .input-wrapper.input-keybind {
+    display: block;
+}
+
+body.keybind-boot .keyboard-backdrop {
+    pointer-events: auto;
+}
+
 body.keyboard-prompt .input-wrapper.input-keybind {
     display: block;
     left: 50%;

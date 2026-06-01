@@ -230,6 +230,7 @@ function RoutedApp() {
 
   const useGameCursor = state.visible && !state.inputVisible && !isLocalDevMode();
   const keyboardPromptOpen = state.inputVisible && state.inputMode === "keybind";
+  const showKeybindOverlay = keyboardPromptOpen && !state.visible;
 
   useEffect(() => {
     if (!state.visible) return;
@@ -250,7 +251,8 @@ function RoutedApp() {
     document.body.classList.toggle("menu-open", state.visible);
     document.body.classList.toggle("game-cursor", useGameCursor);
     document.body.classList.toggle("keyboard-prompt", keyboardPromptOpen);
-  }, [state.menuColor, state.visible, useGameCursor, keyboardPromptOpen]);
+    document.body.classList.toggle("keybind-boot", showKeybindOverlay);
+  }, [state.menuColor, state.visible, useGameCursor, keyboardPromptOpen, showKeybindOverlay]);
 
   useEffect(() => {
     if (!isLocalDevMode() || !state.visible) return;
