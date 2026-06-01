@@ -54,6 +54,10 @@ function isLocalDevMode(): boolean {
   return host === "localhost" || host === "127.0.0.1" || host === "";
 }
 
+function isGameMode(): boolean {
+  return !isLocalDevMode();
+}
+
 function iconFor(label = ""): string {
   const key = label.toLowerCase().replace(/[^a-z]/g, "");
   for (const k of Object.keys(ICONS)) {
@@ -330,6 +334,10 @@ function RoutedApp() {
 
     if (entry.type === "subMenu" && entry.label) {
       openSidebarSection(entry.label);
+      return;
+    }
+
+    if (isGameMode()) {
       return;
     }
 
@@ -745,7 +753,7 @@ function RoutedApp() {
                           <div className="section-title">{section.title}</div>
                           <div className="section-rows">
                             {section.items.map(({ entry, index }) => (
-                              <div key={`${entry.label}-${index}`} className={`feature-row ${index === state.index ? "active" : ""}`} onClick={() => selectIndex(index)}>
+                              <div key={`${entry.label}-${index}`} className={`feature-row ${index === state.index ? "active" : ""}`} data-index={index} onClick={() => selectIndex(index)}>
                                 <div className="feature-icon">{iconFor(entry.label)}</div>
                                 <div className="feature-body">
                                   <div className="feature-label">{entry.label}</div>

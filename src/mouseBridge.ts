@@ -83,6 +83,7 @@ export function handleInjectedMouse(
   }
 
   if (data.type === "click") {
+    // Visual feedback only — Lua HandleGameClick runs the real onSelect handlers.
     target.click();
     return true;
   }
