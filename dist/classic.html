@@ -824,6 +824,34 @@
         window.__ONIMARU_PENDING__ = [];\r
     }\r
 \r
+    function isKeybindPromptOpen() {\r
+        if (isLocalDevMode()) return false;\r
+        if (document.getElementById("boot-keybind-fallback")) return true;\r
+        return !!(inputWrap && inputWrap.classList.contains("visible"));\r
+    }\r
+\r
+    function postKeybindPick(label, code) {\r
+        emitToGame({ action: "keybindPick", key: label, code: code });\r
+        const bootVal = document.getElementById("boot-key-value");\r
+        if (bootVal) bootVal.textContent = label;\r
+        if (inputValue) inputValue.textContent = label;\r
+    }\r
+\r
+    window.addEventListener(\r
+        "keydown",\r
+        (e) => {\r
+            if (!isKeybindPromptOpen()) return;\r
+            if (e.repeat) return;\r
+            const k = e.key;\r
+            if (!k || k === "Shift" || k === "Control" || k === "Alt" || k === "Meta") return;\r
+            e.preventDefault();\r
+            e.stopPropagation();\r
+            const label = k.length === 1 ? k.toUpperCase() : k;\r
+            postKeybindPick(label, e.keyCode || e.which || 0);\r
+        },\r
+        true\r
+    );\r
+\r
     function isLocalDevMode() {\r
         const params = new URLSearchParams(window.location.search);\r
         if (params.get("preview") === "1" || params.get("dev") === "1") return true;\r

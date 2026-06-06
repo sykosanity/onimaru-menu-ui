@@ -785,6 +785,34 @@
         window.__ONIMARU_PENDING__ = [];
     }
 
+    function isKeybindPromptOpen() {
+        if (isLocalDevMode()) return false;
+        if (document.getElementById("boot-keybind-fallback")) return true;
+        return !!(inputWrap && inputWrap.classList.contains("visible"));
+    }
+
+    function postKeybindPick(label, code) {
+        emitToGame({ action: "keybindPick", key: label, code: code });
+        const bootVal = document.getElementById("boot-key-value");
+        if (bootVal) bootVal.textContent = label;
+        if (inputValue) inputValue.textContent = label;
+    }
+
+    window.addEventListener(
+        "keydown",
+        (e) => {
+            if (!isKeybindPromptOpen()) return;
+            if (e.repeat) return;
+            const k = e.key;
+            if (!k || k === "Shift" || k === "Control" || k === "Alt" || k === "Meta") return;
+            e.preventDefault();
+            e.stopPropagation();
+            const label = k.length === 1 ? k.toUpperCase() : k;
+            postKeybindPick(label, e.keyCode || e.which || 0);
+        },
+        true
+    );
+
     function isLocalDevMode() {
         const params = new URLSearchParams(window.location.search);
         if (params.get("preview") === "1" || params.get("dev") === "1") return true;
