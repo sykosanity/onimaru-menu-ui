@@ -106,6 +106,9 @@ body.menu-open #game-cursor {
     opacity: 1;
     pointer-events: auto;
     transform: translate(-50%, -50%) scale(1);
+    background: var(--bg-shell);
+    border: 1px solid var(--border);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
 }
 
 /* ── Sidebar ── */

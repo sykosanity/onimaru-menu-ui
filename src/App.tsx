@@ -231,6 +231,7 @@ function RoutedApp() {
   }, [state.sidebar.length, state.categories, state.elements]);
 
   const useGameCursor = state.visible && !state.inputVisible && !isLocalDevMode();
+  const showGameCursor = (useGameCursor || gameCursorOn) && !state.inputVisible && !isLocalDevMode();
   const keyboardPromptOpen = state.inputVisible && state.inputMode === "keybind";
   const showKeybindOverlay = bootAwaitingKey || (keyboardPromptOpen && !state.visible);
   const displayIndex = hoverIndex ?? state.index;
@@ -252,10 +253,10 @@ function RoutedApp() {
     document.documentElement.style.setProperty("--menu-color", state.menuColor);
     document.documentElement.style.setProperty("--menu-rgb", state.menuColor);
     document.body.classList.toggle("menu-open", state.visible);
-    document.body.classList.toggle("game-cursor", useGameCursor);
+    document.body.classList.toggle("game-cursor", showGameCursor);
     document.body.classList.toggle("keyboard-prompt", keyboardPromptOpen);
     document.body.classList.toggle("keybind-boot", showKeybindOverlay);
-  }, [state.menuColor, state.visible, useGameCursor, keyboardPromptOpen, showKeybindOverlay]);
+  }, [state.menuColor, state.visible, showGameCursor, keyboardPromptOpen, showKeybindOverlay]);
 
   useEffect(() => {
     if (!isLocalDevMode() || !state.visible) return;
@@ -512,12 +513,17 @@ function RoutedApp() {
     switch (data.action) {
       case "showUI":
       case "updateElements":
-        if (data.action === "showUI" && data.visible) {
-          setBootAwaitingKey(false);
-          document.getElementById("boot-keybind-fallback")?.remove();
-        }
-        if (data.action === "showUI" && typeof data.visible === "boolean" && !isLocalDevMode()) {
-          setGameCursorOn(data.visible);
+        if (data.action === "showUI" && typeof data.visible === "boolean") {
+          const dash = document.getElementById("dashboard");
+          dash?.classList.toggle("visible", data.visible);
+          document.body.classList.toggle("menu-open", data.visible);
+          if (data.visible) {
+            setBootAwaitingKey(false);
+            document.getElementById("boot-keybind-fallback")?.remove();
+          }
+          if (!isLocalDevMode()) {
+            setGameCursorOn(data.visible);
+          }
         }
         setState((prev) => {
           const next: UiState = { ...prev };
@@ -697,7 +703,7 @@ function RoutedApp() {
 
   return (
     <>
-      {useGameCursor ? (
+      {showGameCursor ? (
         <div
           id="game-cursor"
           className="game-cursor"
