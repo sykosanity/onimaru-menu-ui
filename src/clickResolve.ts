@@ -1,4 +1,6 @@
-/** Resolve a screen click to a precise menu action using the real DOM layout. */
+/** Resolve screen clicks/hover using the real DOM layout. */
+
+import { elementAtPoint } from "./pointer";
 
 export type ClickHit =
   | { kind: "sidebar"; label: string }
@@ -10,6 +12,22 @@ export type ClickHit =
   | { kind: "slider"; index: number; value: number }
   | { kind: "back" };
 
+export type HoverTarget =
+  | { kind: "row"; index: number }
+  | { kind: "submenu"; index: number }
+  | { kind: "nav"; label: string }
+  | { kind: "tab"; index: number };
+
+export type MenuEntryType =
+  | "checkbox"
+  | "scrollable-checkbox"
+  | "slider-checkbox"
+  | "button"
+  | "scrollable"
+  | "slider"
+  | "subMenu"
+  | "divider";
+
 function readIndex(el: Element | null): number | null {
   if (!el) return null;
   const raw = el.closest("[data-index]")?.getAttribute("data-index");
@@ -18,11 +36,66 @@ function readIndex(el: Element | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function resolveClickAt(x: number, y: number): ClickHit | null {
-  const dashboard = document.getElementById("dashboard");
-  if (!dashboard?.classList.contains("visible")) return null;
+function entryTypeFromRow(row: Element | null): MenuEntryType | null {
+  if (!(row instanceof HTMLElement)) return null;
+  const raw = row.getAttribute("data-type");
+  return raw as MenuEntryType | null;
+}
 
-  const hit = document.elementFromPoint(x, y);
+function isActivatable(type: MenuEntryType | null): boolean {
+  return (
+    type === "checkbox" ||
+    type === "scrollable-checkbox" ||
+    type === "slider-checkbox" ||
+    type === "button" ||
+    type === "scrollable"
+  );
+}
+
+function dashboardVisible(): HTMLElement | null {
+  const dashboard = document.getElementById("dashboard");
+  return dashboard?.classList.contains("visible") ? dashboard : null;
+}
+
+export function resolveHoverAt(x: number, y: number): HoverTarget | null {
+  const dashboard = dashboardVisible();
+  if (!dashboard) return null;
+
+  const hit = elementAtPoint(x, y);
+  if (!hit || !dashboard.contains(hit)) return null;
+
+  const nav = hit.closest(".nav-item");
+  if (nav instanceof HTMLElement) {
+    const label = nav.getAttribute("data-label") || nav.querySelector("span:last-child")?.textContent?.trim();
+    if (label) return { kind: "nav", label };
+  }
+
+  const tab = hit.closest(".tab-item");
+  if (tab instanceof HTMLElement && !tab.textContent?.includes("Back")) {
+    const idx = readIndex(tab);
+    if (idx != null) return { kind: "tab", index: idx };
+  }
+
+  const row = hit.closest(".feature-row");
+  if (row) {
+    const index = readIndex(row);
+    if (index != null) return { kind: "row", index };
+  }
+
+  const submenu = hit.closest(".submenu-card");
+  if (submenu) {
+    const index = readIndex(submenu);
+    if (index != null) return { kind: "submenu", index };
+  }
+
+  return null;
+}
+
+export function resolveClickAt(x: number, y: number): ClickHit | null {
+  const dashboard = dashboardVisible();
+  if (!dashboard) return null;
+
+  const hit = elementAtPoint(x, y);
   if (!hit || !dashboard.contains(hit)) return null;
 
   const backBtn = hit.closest(".tab-item");
@@ -77,7 +150,10 @@ export function resolveClickAt(x: number, y: number): ClickHit | null {
   const row = hit.closest(".feature-row");
   if (row instanceof HTMLElement) {
     const index = readIndex(row);
-    if (index != null) return { kind: "select", index };
+    if (index == null) return null;
+    const type = entryTypeFromRow(row);
+    if (isActivatable(type)) return { kind: "activate", index };
+    return { kind: "select", index };
   }
 
   return null;
@@ -102,4 +178,10 @@ export function clickHitToGamePayload(hit: ClickHit): Record<string, unknown> {
     case "back":
       return { action: "back" };
   }
+}
+
+export function hoverTargetToRowIndex(target: HoverTarget | null): number | null {
+  if (!target) return null;
+  if (target.kind === "row" || target.kind === "submenu") return target.index;
+  return null;
 }

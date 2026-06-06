@@ -473,9 +473,15 @@ body.menu-open #game-cursor {
     background: var(--bg-card-hover);
 }
 
-.feature-row.active {
+.feature-row.active,
+.feature-row.highlighted {
     background: var(--bg-row-active);
     box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.feature-row.active .feature-label,
+.feature-row.highlighted .feature-label {
+    color: var(--text);
 }
 
 .feature-icon {

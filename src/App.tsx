@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { emitToGame } from "./bridge";
 import { buildMockShowUiPayload } from "./mockData";
-import { handleInjectedMouse, isInjectedMouseMessage } from "./mouseBridge";
+import { handleInjectedMouse, installClickResolver, isInjectedMouseMessage } from "./mouseBridge";
 import { installDuiMessageBridge, parseDuiPayload } from "./duiBridge";
 import { installOutboundBridge } from "./bridge";
 import type { BindItem, MenuCategory, MenuEntry, UiMessage, UiState } from "./types";
@@ -58,11 +58,11 @@ function isGameMode(): boolean {
   return !isLocalDevMode();
 }
 
-function scrollActiveMenuItem() {
-  const selectors = [".feature-row.active", ".nav-item.active", ".tab-item.active", ".submenu-card.active"];
-  for (const selector of selectors) {
-    document.querySelector(selector)?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
-  }
+function scrollActiveMenuItem(displayIndex: number) {
+  document.querySelector(`.feature-row[data-index="${displayIndex}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  document.querySelector(".nav-item.active")?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  document.querySelector(".tab-item.active")?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  document.querySelector(".submenu-card.active")?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
 }
 
 function iconFor(label = ""): string {
@@ -215,6 +215,7 @@ function RoutedApp() {
   const [notifications, setNotifications] = useState<Notice[]>([]);
   const [gameCursor, setGameCursor] = useState({ x: 0, y: 0 });
   const [gameCursorOn, setGameCursorOn] = useState(false);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const nextNoticeId = useRef(1);
 
   const activeTabs = useMemo(() => {
@@ -231,19 +232,20 @@ function RoutedApp() {
   const useGameCursor = state.visible && !state.inputVisible && !isLocalDevMode();
   const keyboardPromptOpen = state.inputVisible && state.inputMode === "keybind";
   const showKeybindOverlay = keyboardPromptOpen && !state.visible;
+  const displayIndex = hoverIndex ?? state.index;
 
   useEffect(() => {
     if (!state.visible) return;
     requestAnimationFrame(() => {
       document.querySelector(".dash-content")?.scrollTo({ top: 0, behavior: "auto" });
-      scrollActiveMenuItem();
+      scrollActiveMenuItem(displayIndex);
     });
-  }, [state.sidebarActive, state.categoryIndex, state.visible]);
+  }, [state.sidebarActive, state.categoryIndex, state.visible, displayIndex]);
 
   useEffect(() => {
     if (!state.visible) return;
-    requestAnimationFrame(() => scrollActiveMenuItem());
-  }, [state.index, state.visible, state.categoryIndex, state.sidebarActive]);
+    requestAnimationFrame(() => scrollActiveMenuItem(displayIndex));
+  }, [displayIndex, state.visible, state.categoryIndex, state.sidebarActive]);
 
   useEffect(() => {
     document.documentElement.style.setProperty("--menu-color", state.menuColor);
@@ -326,6 +328,34 @@ function RoutedApp() {
       const current = section ? `/${section}` : "/";
       if (current !== target) navigate(target, { replace });
     }
+  };
+
+  const clickActivate = (index: number) => {
+    const entry = activeTabs[index];
+    if (!entry || entry.type === "divider") return;
+
+    if (isGameMode()) {
+      emitToGame({ action: "activate", index });
+      return;
+    }
+    activateAtIndex(index);
+  };
+
+  const clickRow = (index: number) => {
+    const entry = activeTabs[index];
+    if (!entry || entry.type === "divider") return;
+
+    if (
+      entry.type === "checkbox" ||
+      entry.type === "scrollable-checkbox" ||
+      entry.type === "slider-checkbox" ||
+      entry.type === "button" ||
+      entry.type === "scrollable"
+    ) {
+      clickActivate(index);
+      return;
+    }
+    selectIndex(index);
   };
 
   const selectIndex = (index: number) => {
@@ -523,11 +553,16 @@ function RoutedApp() {
           }
           return next;
         });
+        if (typeof data.index === "number") setHoverIndex(null);
         break;
       case "keydown":
-        if (typeof data.index === "number") {
-          const nextIndex = data.index;
-          setState((prev) => ({ ...prev, index: nextIndex }));
+      case "highlight":
+        if (typeof data.index === "number" || typeof data.index === "string") {
+          const nextIndex = Number(data.index);
+          if (Number.isFinite(nextIndex)) {
+            setHoverIndex(null);
+            setState((prev) => ({ ...prev, index: nextIndex }));
+          }
         }
         break;
       case "updateBanner":
@@ -566,7 +601,10 @@ function RoutedApp() {
         break;
       case "mouse":
         if (isInjectedMouseMessage(data)) {
-          handleInjectedMouse(data, (x, y) => setGameCursor({ x, y }));
+          handleInjectedMouse(data, {
+            onMove: (x, y) => setGameCursor({ x, y }),
+            onHover: (index) => setHoverIndex(index),
+          });
         }
         break;
       default:
@@ -576,6 +614,7 @@ function RoutedApp() {
 
   useEffect(() => {
     installOutboundBridge();
+    installClickResolver();
     installDuiMessageBridge((msg) => processMessage(msg));
     return () => {
       const w = window as Window & { onDuiMessage?: undefined; receiveDuiMessage?: undefined };
@@ -628,8 +667,8 @@ function RoutedApp() {
   }, [activeTabs]);
 
   const dashboardMetrics = useMemo(
-    () => sectionMetrics(state.sidebarActive || "", activeTabs, activeTabs[state.index]),
-    [state.sidebarActive, activeTabs, state.index]
+    () => sectionMetrics(state.sidebarActive || "", activeTabs, activeTabs[displayIndex]),
+    [state.sidebarActive, activeTabs, displayIndex]
   );
 
   const activityItems = useMemo(() => {
@@ -745,7 +784,7 @@ function RoutedApp() {
                     .map(({ entry, index }) => (
                       <button
                         key={entry.label}
-                        className={`submenu-card ${index === state.index ? "active" : ""}`}
+                        className={`submenu-card ${index === displayIndex ? "active" : ""}`}
                         type="button"
                         data-index={index}
                         data-label={entry.label}
@@ -777,7 +816,7 @@ function RoutedApp() {
                           <div className="section-title">{section.title}</div>
                           <div className="section-rows">
                             {section.items.map(({ entry, index }) => (
-                              <div key={`${entry.label}-${index}`} className={`feature-row ${index === state.index ? "active" : ""}`} data-index={index} onClick={() => selectIndex(index)}>
+                              <div key={`${entry.label}-${index}`} className={`feature-row ${index === displayIndex ? "active" : ""}`} data-index={index} data-type={entry.type} onClick={() => clickRow(index)}>
                                 <div className="feature-icon">{iconFor(entry.label)}</div>
                                 <div className="feature-body">
                                   <div className="feature-label">{entry.label}</div>
@@ -796,10 +835,10 @@ function RoutedApp() {
                                     </>
                                   )}
                                   {(entry.type === "checkbox" || entry.type === "scrollable-checkbox" || entry.type === "slider-checkbox") && (
-                                    <button type="button" className={`toggle ${entry.checked ? "on" : ""}`} onClick={(e) => { e.stopPropagation(); activateAtIndex(index); }} />
+                                    <button type="button" className={`toggle ${entry.checked ? "on" : ""}`} onClick={(e) => { e.stopPropagation(); clickActivate(index); }} />
                                   )}
                                   {entry.type === "button" && (
-                                    <button type="button" className="btn-pill" onClick={(e) => { e.stopPropagation(); activateAtIndex(index); }}>
+                                    <button type="button" className="btn-pill" onClick={(e) => { e.stopPropagation(); clickActivate(index); }}>
                                       Run
                                     </button>
                                   )}
@@ -833,7 +872,7 @@ function RoutedApp() {
         </main>
       </div>
 
-      <div className={`desc-toast ${activeTabs[state.index]?.desc && state.visible ? "visible" : ""}`}>{activeTabs[state.index]?.desc || ""}</div>
+      <div className={`desc-toast ${activeTabs[displayIndex]?.desc && state.visible ? "visible" : ""}`}>{activeTabs[displayIndex]?.desc || ""}</div>
 
       {keyboardPromptOpen ? <div className="keyboard-backdrop" aria-hidden /> : null}
 
