@@ -3,7 +3,7 @@ import { HashRouter, Navigate, Route, Routes, useNavigate, useParams } from "rea
 import { emitToGame } from "./bridge";
 import { buildMockShowUiPayload } from "./mockData";
 import { handleInjectedMouse, installClickResolver, isInjectedMouseMessage } from "./mouseBridge";
-import { installDuiMessageBridge, parseDuiPayload } from "./duiBridge";
+import { subscribeDuiMessages } from "./duiBootstrap";
 import { installOutboundBridge } from "./bridge";
 import type { BindItem, MenuCategory, MenuEntry, UiMessage, UiState } from "./types";
 
@@ -216,6 +216,7 @@ function RoutedApp() {
   const [gameCursor, setGameCursor] = useState({ x: 0, y: 0 });
   const [gameCursorOn, setGameCursorOn] = useState(false);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [bootAwaitingKey, setBootAwaitingKey] = useState(() => isGameMode());
   const nextNoticeId = useRef(1);
 
   const activeTabs = useMemo(() => {
@@ -231,7 +232,7 @@ function RoutedApp() {
 
   const useGameCursor = state.visible && !state.inputVisible && !isLocalDevMode();
   const keyboardPromptOpen = state.inputVisible && state.inputMode === "keybind";
-  const showKeybindOverlay = keyboardPromptOpen && !state.visible;
+  const showKeybindOverlay = bootAwaitingKey || (keyboardPromptOpen && !state.visible);
   const displayIndex = hoverIndex ?? state.index;
 
   useEffect(() => {
@@ -511,6 +512,10 @@ function RoutedApp() {
     switch (data.action) {
       case "showUI":
       case "updateElements":
+        if (data.action === "showUI" && data.visible) {
+          setBootAwaitingKey(false);
+          document.getElementById("boot-keybind-fallback")?.remove();
+        }
         if (data.action === "showUI" && typeof data.visible === "boolean" && !isLocalDevMode()) {
           setGameCursorOn(data.visible);
         }
@@ -569,6 +574,17 @@ function RoutedApp() {
         }
         break;
       case "updateKeyboard":
+        if (data.visible && data.mode === "keybind") {
+          setBootAwaitingKey(true);
+        }
+        if (!data.visible) {
+          setBootAwaitingKey(false);
+          document.getElementById("boot-keybind-fallback")?.remove();
+        }
+        if (data.value !== undefined) {
+          const el = document.getElementById("boot-key-value");
+          if (el) el.textContent = String(data.value) || "Waiting for key…";
+        }
         setState((prev) => ({
           ...prev,
           inputVisible: !!data.visible,
@@ -612,12 +628,7 @@ function RoutedApp() {
   useEffect(() => {
     installOutboundBridge();
     installClickResolver();
-    installDuiMessageBridge((msg) => processMessage(msg));
-    return () => {
-      const w = window as Window & { onDuiMessage?: undefined; receiveDuiMessage?: undefined };
-      delete w.onDuiMessage;
-      delete w.receiveDuiMessage;
-    };
+    return subscribeDuiMessages((msg) => processMessage(msg));
   }, []);
 
   useEffect(() => {
@@ -871,14 +882,14 @@ function RoutedApp() {
 
       <div className={`desc-toast ${activeTabs[displayIndex]?.desc && state.visible ? "visible" : ""}`}>{activeTabs[displayIndex]?.desc || ""}</div>
 
-      {keyboardPromptOpen ? <div className="keyboard-backdrop" aria-hidden /> : null}
+      {keyboardPromptOpen || bootAwaitingKey ? <div className="keyboard-backdrop" aria-hidden /> : null}
 
       <div
-        className={`input-wrapper ${state.inputVisible ? "visible" : ""} ${state.inputMode === "keybind" ? "input-keybind" : ""}`}
+        className={`input-wrapper ${state.inputVisible || bootAwaitingKey ? "visible" : ""} ${state.inputMode === "keybind" || bootAwaitingKey ? "input-keybind" : ""}`}
       >
-        <div className="input-header">{state.inputTitle}</div>
+        <div className="input-header">{bootAwaitingKey && !state.inputTitle ? "Choose Menu Key" : state.inputTitle}</div>
         <div className="input-body">
-          {state.inputMode === "keybind" ? (
+          {state.inputMode === "keybind" || bootAwaitingKey ? (
             <>
               <p className="input-hint">Press any key on your keyboard to set the menu open key.</p>
               <div className="input-key-display">{state.inputValue || "Waiting for key…"}</div>
