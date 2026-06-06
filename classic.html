@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Onimaru Menu</title>
+    <style>
+      #boot-keybind-fallback {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(6, 4, 12, 0.92);
+        font-family: "Segoe UI", Inter, system-ui, sans-serif;
+        color: #f4f2f8;
+        pointer-events: none;
+      }
+      #boot-keybind-fallback .boot-keybind-card {
+        text-align: center;
+        padding: 28px 36px;
+        border-radius: 14px;
+        border: 1px solid rgba(139, 92, 246, 0.35);
+        background: rgba(18, 14, 28, 0.98);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+        max-width: min(440px, 90vw);
+      }
+      #boot-keybind-fallback strong { display: block; font-size: 18px; margin-bottom: 10px; color: rgb(139, 92, 246); }
+      #boot-keybind-fallback p { font-size: 14px; line-height: 1.5; color: #9b94ad; margin: 0 0 16px; }
+      #boot-key-value {
+        font-size: 16px;
+        font-weight: 600;
+        padding: 12px 16px;
+        border-radius: 10px;
+        background: rgba(139, 92, 246, 0.12);
+        border: 1px solid rgba(139, 92, 246, 0.25);
+      }
+    </style>
+</head>
+<body>
+    <div id="boot-keybind-fallback" aria-live="polite">
+      <div class="boot-keybind-card">
+        <strong>Choose Menu Key</strong>
+        <p>Press any key on your keyboard to set the key that opens the menu.</p>
+        <div id="boot-key-value">Waiting for key…</div>
+      </div>
+    </div>
+
+    <div id="page-error" style="display:none">
+      <div><strong>Onimaru UI failed to load</strong></div>
+    </div>
+
+    <div id="dashboard" class="dashboard">
+      <aside class="dash-sidebar">
+        <div class="dash-brand">
+          <span class="brand-mark"></span>
+          <span id="brand" class="brand-text">onimaru</span>
+        </div>
+        <nav id="sidebar-nav" class="dash-nav"></nav>
+        <div class="dash-profile">
+          <div class="profile-avatar"></div>
+          <div class="profile-meta">
+            <span id="profile-name" class="profile-name">Player</span>
+            <span class="profile-badge">ACTIVE</span>
+          </div>
+        </div>
+      </aside>
+      <main class="dash-main">
+        <header class="dash-header">
+          <nav id="tab-nav" class="dash-tabs"></nav>
+        </header>
+        <div class="dash-content">
+          <section class="dash-page">
+            <div id="content"></div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <div id="desc-toast" class="desc-toast"></div>
+
+    <div id="input-wrapper" class="input-wrapper input-keybind">
+      <div id="input-title" class="input-header">Input</div>
+      <div class="input-body"><span id="input-value"></span></div>
+    </div>
+
+    <div id="kbl-wrapper" class="kbl-wrapper">
+      <div class="kbl-header"><span class="kbl-icon">⌨</span> Keybinds</div>
+      <div id="kbl-list" class="kbl-list"></div>
+    </div>
+
+    <div id="notifications" class="notifications"></div>
+    <div id="fc-wrapper" class="fc-wrapper"></div>
+
+    <script>
+      window.__ONIMARU_PENDING__ = window.__ONIMARU_PENDING__ || [];
+      window.__ONIMARU_DUI = window.__ONIMARU_DUI || {
+        push: function (p) {
+          if (window.__ONIMARU_READY__) window.__ONIMARU_READY__(p);
+          else window.__ONIMARU_PENDING__.push(p);
+        },
+      };
+    </script>
+    <script type="module" src="/src/classic-main.ts"></script>
+</body>
+</html>

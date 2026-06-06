@@ -766,6 +766,25 @@
         if (data) processMessage(data);
     });
 
+    function ingestDuiMessage(raw) {
+        const data = parsePayload(raw);
+        if (data) processMessage(data);
+    }
+
+    window.onDuiMessage = ingestDuiMessage;
+    window.receiveDuiMessage = ingestDuiMessage;
+    window.DuiMessage = ingestDuiMessage;
+    window.__ONIMARU_READY__ = ingestDuiMessage;
+    window.__ONIMARU_DUI = {
+        push(raw) {
+            ingestDuiMessage(raw);
+        },
+    };
+    if (Array.isArray(window.__ONIMARU_PENDING__) && window.__ONIMARU_PENDING__.length) {
+        window.__ONIMARU_PENDING__.forEach((raw) => ingestDuiMessage(raw));
+        window.__ONIMARU_PENDING__ = [];
+    }
+
     function isLocalDevMode() {
         const params = new URLSearchParams(window.location.search);
         if (params.get("preview") === "1" || params.get("dev") === "1") return true;
@@ -779,6 +798,9 @@
         switch (data.action) {
             case "showUI":
                 state.visible = !!data.visible;
+                if (data.visible) {
+                    document.getElementById("boot-keybind-fallback")?.remove();
+                }
                 applyPayload(data);
                 if (!data.visible) {
                     setTimeout(() => {
@@ -793,18 +815,51 @@
                 render();
                 break;
             case "keydown":
+            case "highlight":
                 if (typeof data.index === "number") {
                     state.index = data.index;
                     render();
                 }
                 break;
+            case "setCursor":
+                document.body.classList.toggle("game-cursor", !!data.visible);
+                break;
+            case "mouse": {
+                if (typeof data.x !== "number" || typeof data.y !== "number") break;
+                const px = data.x * window.innerWidth;
+                const py = data.y * window.innerHeight;
+                let gc = document.getElementById("game-cursor");
+                if (!gc && !isLocalDevMode()) {
+                    gc = document.createElement("div");
+                    gc.id = "game-cursor";
+                    gc.className = "game-cursor";
+                    gc.setAttribute("aria-hidden", "true");
+                    document.body.appendChild(gc);
+                }
+                if (gc) {
+                    gc.style.left = px + "px";
+                    gc.style.top = py + "px";
+                }
+                if (data.type === "up" || data.type === "click") {
+                    const hit = document.elementFromPoint(px, py);
+                    if (hit) hit.click();
+                }
+                break;
+            }
             case "updateBanner":
                 if (data.bannerColor) setMenuColor(data.bannerColor);
                 break;
             case "updateKeyboard":
+                if (!data.visible) {
+                    document.getElementById("boot-keybind-fallback")?.remove();
+                }
                 inputWrap.classList.toggle("visible", !!data.visible);
                 if (data.title) inputTitle.textContent = data.title;
-                if (data.value !== undefined) inputValue.textContent = data.value;
+                if (data.value !== undefined) {
+                    inputValue.textContent = data.value;
+                    const bootVal = document.getElementById("boot-key-value");
+                    if (bootVal) bootVal.textContent = data.value || "Waiting for key…";
+                }
                 break;
             case "displayBinds":
                 kblWrap.classList.toggle("visible", !!data.visible);
