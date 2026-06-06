@@ -1,8 +1,15 @@
-/** Macho DUI: Lua sends normalized pointer; UI maps pixels → DOM hits (WYSIWYG). */
+/**
+ * Macho DUI input bridge.
+ *
+ * Lua streams the in-game pointer as normalized coords + synthetic mouse events.
+ * Instead of re-deriving "what was clicked" with a parallel resolver, we replay the
+ * pointer as REAL DOM events on the element under the cursor. React's own handlers
+ * (clickRow, clickActivate, adjustSlider, openSidebarSection, ...) then fire exactly
+ * like they do for a real browser click — so in-game behaviour matches the browser 1:1.
+ */
 
-import { clickHitToGamePayload, resolveClickAt, resolveHoverAt, hoverTargetToRowIndex } from "./clickResolve";
+import { resolveHoverAt, hoverTargetToRowIndex } from "./clickResolve";
 import type { HoverTarget } from "./clickResolve";
-import { emitToGame } from "./bridge";
 import { elementAtPoint, pointerFromNorm } from "./pointer";
 
 const SCROLLABLE =
@@ -58,35 +65,44 @@ function reportHover(x: number, y: number, handlers: MouseBridgeHandlers) {
   handlers.onHover?.(hoverTargetToRowIndex(target), target);
 }
 
-function dispatchResolvedClick(x: number, y: number) {
-  const hit = resolveClickAt(x, y);
-  if (!hit) return;
-  emitToGame(clickHitToGamePayload(hit) as Parameters<typeof emitToGame>[0]);
+function fireMouse(target: EventTarget, type: string, x: number, y: number) {
+  target.dispatchEvent(
+    new MouseEvent(type, { bubbles: true, cancelable: true, view: window, button: 0, clientX: x, clientY: y }),
+  );
 }
 
-// While the pointer is held on a slider track, drag updates the value live.
-let sliderDrag: { index: number; track: HTMLElement } | null = null;
-
-function sliderTrackAt(x: number, y: number): { index: number; track: HTMLElement } | null {
-  const hit = elementAtPoint(x, y);
-  const track = hit?.closest(".slider-track");
-  if (!(track instanceof HTMLElement)) return null;
-  const raw = track.closest(".feature-row")?.getAttribute("data-index");
-  const index = raw == null ? NaN : Number(raw);
-  return Number.isFinite(index) ? { index, track } : null;
+function firePointer(target: EventTarget, type: string, x: number, y: number) {
+  const Ctor = (window as unknown as { PointerEvent?: typeof PointerEvent }).PointerEvent;
+  if (Ctor) {
+    target.dispatchEvent(
+      new Ctor(type, {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        button: 0,
+        clientX: x,
+        clientY: y,
+        pointerId: 1,
+        pointerType: "mouse",
+        isPrimary: true,
+      }),
+    );
+  } else {
+    fireMouse(target, type === "pointerdown" ? "mousedown" : type === "pointerup" ? "mouseup" : "mousemove", x, y);
+  }
 }
 
-function emitSliderAt(drag: { index: number; track: HTMLElement }, x: number) {
-  const rect = drag.track.getBoundingClientRect();
-  if (rect.width <= 0) return;
-  const pct = Math.max(0, Math.min(1, (x - rect.left) / rect.width));
-  emitToGame({ action: "slider", index: drag.index, pct } as Parameters<typeof emitToGame>[0]);
-}
+let pressed = false;
 
+/** Optional hook kept for Lua-side forced resolution: replays a click at a pixel. */
 export function installClickResolver(): void {
   const w = window as Window & { __onimaruResolveClick?: (x: number, y: number) => boolean };
   w.__onimaruResolveClick = (x: number, y: number) => {
-    dispatchResolvedClick(x, y);
+    const el = elementAtPoint(x, y);
+    if (!el) return false;
+    firePointer(el, "pointerdown", x, y);
+    firePointer(window, "pointerup", x, y);
+    fireMouse(el, "click", x, y);
     return true;
   };
 }
@@ -100,9 +116,8 @@ export function handleInjectedMouse(data: InjectedMouseMessage, handlers: MouseB
   handlers.onMove(x, y);
 
   if (data.type === "move") {
-    if (sliderDrag) {
-      emitSliderAt(sliderDrag, x);
-    }
+    // While the button is held, replay drag so sliders (pointermove on window) track live.
+    if (pressed) firePointer(window, "pointermove", x, y);
     reportHover(x, y, handlers);
     return true;
   }
@@ -118,19 +133,27 @@ export function handleInjectedMouse(data: InjectedMouseMessage, handlers: MouseB
   if (!dashboard?.classList.contains("visible")) return true;
 
   if (data.type === "down") {
-    sliderDrag = sliderTrackAt(x, y);
-    if (sliderDrag) emitSliderAt(sliderDrag, x);
+    const el = elementAtPoint(x, y);
+    if (el) {
+      pressed = true;
+      firePointer(el, "pointerdown", x, y);
+      fireMouse(el, "mousedown", x, y);
+    }
     reportHover(x, y, handlers);
     return true;
   }
 
   if (data.type === "up" || data.type === "click") {
-    if (sliderDrag) {
-      emitSliderAt(sliderDrag, x);
-      sliderDrag = null;
-    } else {
-      dispatchResolvedClick(x, y);
+    const el = elementAtPoint(x, y);
+    // Pointerup on window first so any active slider drag commits its final value.
+    firePointer(window, "pointerup", x, y);
+    if (el) {
+      fireMouse(el, "mouseup", x, y);
+      // A real browser only emits "click" when up lands on the press target; for a
+      // single in-game tap that is the same element, so this mirrors browser behaviour.
+      fireMouse(el, "click", x, y);
     }
+    pressed = false;
     reportHover(x, y, handlers);
     return true;
   }

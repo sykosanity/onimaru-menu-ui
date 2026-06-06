@@ -345,14 +345,11 @@ function RoutedApp() {
     const entry = activeTabs[index];
     if (!entry || entry.type === "divider") return;
 
-    if (
-      entry.type === "checkbox" ||
-      entry.type === "scrollable-checkbox" ||
-      entry.type === "slider-checkbox" ||
-      entry.type === "button" ||
-      entry.type === "scrollable"
-    ) {
-      clickActivate(index);
+    // Submenus open on a row click. Everything else (toggles, sliders, buttons,
+    // scrollables) only highlights here — the value changes ONLY when its own
+    // control (toggle switch, slider track, ‹/›, Run) is clicked directly.
+    if (entry.type === "subMenu" && entry.label) {
+      openSidebarSection(entry.label);
       return;
     }
     selectIndex(index);
