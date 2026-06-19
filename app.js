@@ -213,15 +213,76 @@
     }
 
     function rowActivatesOnClick(entry) {
-        if (!entry) return false;
+        if (!entry || entry.type === "divider") return false;
         const t = entry.type;
         return (
             t === "checkbox" ||
             t === "button" ||
+            t === "slider" ||
             t === "slider-checkbox" ||
             t === "scrollable-checkbox" ||
-            t === "scrollable"
+            t === "scrollable" ||
+            t === "subMenu"
         );
+    }
+
+    function handleFeatureRowClick(idx, x, y, row) {
+        const entry = getActiveTabs()[idx];
+        if (!entry || entry.type === "divider") return;
+
+        state.index = idx;
+
+        if (entry.type === "slider" || entry.type === "slider-checkbox") {
+            const track = row.querySelector(".slider-track");
+            if (track) {
+                adjustSlider(idx, x, track);
+                return;
+            }
+        }
+
+        if (entry.type === "checkbox" || entry.type === "slider-checkbox" || entry.type === "scrollable-checkbox") {
+            toggleAtIndex(idx);
+            return;
+        }
+
+        if (rowActivatesOnClick(entry)) {
+            activateAtIndex(idx);
+            return;
+        }
+
+        selectIndex(idx);
+    }
+
+    function findMenuTargetAt(x, y) {
+        const stack =
+            typeof document.elementsFromPoint === "function"
+                ? document.elementsFromPoint(x, y)
+                : [document.elementFromPoint(x, y)].filter(Boolean);
+
+        const pairs = [
+            [".toggle", "toggle"],
+            [".scroll-ctrl", "scroll"],
+            [".scroll-value", "scroll-value"],
+            [".slider-track", "slider"],
+            [".btn-pill", "pill"],
+            [".tab-item", "tab"],
+            [".nav-item", "nav"],
+            [".submenu-card", "subcard"],
+            [".feature-row", "row"],
+        ];
+
+        for (const [selector, kind] of pairs) {
+            for (const el of stack) {
+                if (!(el instanceof HTMLElement)) continue;
+                if (el.id === "game-cursor") continue;
+                const target = el.closest(selector);
+                if (target && dashboard.contains(target)) {
+                    return { kind, target };
+                }
+            }
+        }
+
+        return null;
     }
 
     function adjustScrollable(index, dir) {
@@ -267,6 +328,17 @@
             action: "slider",
             index,
             value: tab?.value,
+            pct:
+                trackEl && trackEl.getBoundingClientRect
+                    ? Math.max(
+                          0,
+                          Math.min(
+                              1,
+                              (clientX - trackEl.getBoundingClientRect().left) /
+                                  Math.max(1, trackEl.getBoundingClientRect().width)
+                          )
+                      )
+                    : undefined,
         });
         render();
     }
@@ -423,89 +495,70 @@
         if (!menuIsInteractive()) return false;
 
         const now = Date.now();
-        if (now - lastUiClickAt < 120) return false;
+        if (now - lastUiClickAt < 80) return false;
 
-        const hit = elementAtPoint(x, y);
-        if (!hit || !dashboard.contains(hit)) return false;
+        const hit = findMenuTargetAt(x, y);
+        if (!hit) return false;
 
-        const toggle = hit.closest(".toggle");
-        if (toggle) {
-            const row = toggle.closest(".feature-row");
-            if (row) {
-                lastUiClickAt = now;
-                toggleAtIndex(parseInt(row.dataset.idx, 10));
-                return true;
-            }
+        lastUiClickAt = now;
+        const { kind, target } = hit;
+
+        if (kind === "toggle") {
+            const row = target.closest(".feature-row");
+            if (row) toggleAtIndex(parseInt(row.dataset.idx, 10));
+            return true;
         }
 
-        const scrollCtrl = hit.closest(".scroll-ctrl");
-        if (scrollCtrl) {
-            const row = scrollCtrl.closest(".feature-row");
-            if (row) {
-                lastUiClickAt = now;
-                adjustScrollable(
-                    parseInt(row.dataset.idx, 10),
-                    scrollCtrl.dataset.dir === "left" ? -1 : 1
-                );
-                return true;
-            }
+        if (kind === "scroll") {
+            const row = target.closest(".feature-row");
+            if (!row) return false;
+            adjustScrollable(
+                parseInt(row.dataset.idx, 10),
+                target.dataset.dir === "left" ? -1 : 1
+            );
+            return true;
         }
 
-        const track = hit.closest(".slider-track");
-        if (track) {
-            const row = track.closest(".feature-row");
-            if (row) {
-                lastUiClickAt = now;
-                adjustSlider(parseInt(row.dataset.idx, 10), x, track);
-                return true;
-            }
+        if (kind === "scroll-value") {
+            const row = target.closest(".feature-row");
+            if (row) activateAtIndex(parseInt(row.dataset.idx, 10));
+            return true;
         }
 
-        const btnPill = hit.closest(".btn-pill");
-        if (btnPill) {
-            const row = btnPill.closest(".feature-row");
-            if (row) {
-                lastUiClickAt = now;
-                activateAtIndex(parseInt(row.dataset.idx, 10));
-                return true;
-            }
+        if (kind === "slider") {
+            const row = target.closest(".feature-row");
+            if (!row) return false;
+            adjustSlider(parseInt(row.dataset.idx, 10), x, target);
+            return true;
         }
 
-        const tab = hit.closest(".tab-item");
-        if (tab) {
-            lastUiClickAt = now;
-            if (tab.dataset.uiAction === "back") {
+        if (kind === "pill") {
+            const row = target.closest(".feature-row");
+            if (row) activateAtIndex(parseInt(row.dataset.idx, 10));
+            return true;
+        }
+
+        if (kind === "tab") {
+            if (target.dataset.uiAction === "back") {
                 emitToGame({ action: "back" });
             } else {
-                switchCategory(parseInt(tab.dataset.tabIndex, 10));
+                switchCategory(parseInt(target.dataset.tabIndex, 10));
             }
             return true;
         }
 
-        const nav = hit.closest(".nav-item");
-        if (nav?.dataset.sidebar) {
-            lastUiClickAt = now;
-            openSidebarSection(nav.dataset.sidebar);
+        if (kind === "nav" && target.dataset.sidebar) {
+            openSidebarSection(target.dataset.sidebar);
             return true;
         }
 
-        const subCard = hit.closest(".submenu-card");
-        if (subCard) {
-            lastUiClickAt = now;
-            activateAtIndex(parseInt(subCard.dataset.idx, 10));
+        if (kind === "subcard") {
+            activateAtIndex(parseInt(target.dataset.idx, 10));
             return true;
         }
 
-        const row = hit.closest(".feature-row");
-        if (row) {
-            lastUiClickAt = now;
-            const idx = parseInt(row.dataset.idx, 10);
-            const entry = getActiveTabs()[idx];
-            if (rowActivatesOnClick(entry)) {
-                activateAtIndex(idx);
-            } else {
-                selectIndex(idx);
-            }
+        if (kind === "row") {
+            handleFeatureRowClick(parseInt(target.dataset.idx, 10), x, y, target);
             return true;
         }
 
@@ -972,14 +1025,7 @@
 
             const row = e.target.closest(".feature-row");
             if (row) {
-                const idx = parseInt(row.dataset.idx, 10);
-                const entry = getActiveTabs()[idx];
-                lastUiClickAt = now;
-                if (rowActivatesOnClick(entry)) {
-                    activateAtIndex(idx);
-                } else {
-                    selectIndex(idx);
-                }
+                handleFeatureRowClick(parseInt(row.dataset.idx, 10), e.clientX, e.clientY, row);
                 return;
             }
         });

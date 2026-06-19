@@ -596,7 +596,7 @@ body.menu-open #game-cursor {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    pointer-events: none;
+    cursor: pointer;
 }
 
 .scroll-ctrl {
@@ -635,7 +635,8 @@ body.menu-open #game-cursor {
 
 .slider-track {
     flex: 1;
-    height: 8px;
+    height: 14px;
+    min-width: 72px;
     background: rgba(255, 255, 255, 0.08);
     border-radius: 4px;
     position: relative;
