@@ -9,7 +9,8 @@ if (!existsSync(resolve(dist, "classic.html"))) {
   process.exit(1);
 }
 
+// GitHub Pages serves from repo root — publish built bundles only (never overwrite src/classic.html).
 copyFileSync(resolve(dist, "classic.html"), resolve(root, "classic.html"));
 copyFileSync(resolve(dist, "index.html"), resolve(root, "index.html"));
 writeFileSync(resolve(root, ".nojekyll"), "");
-console.log("Copied dist/classic.html and dist/index.html to repo root for GitHub Pages.");
+console.log("Published dist/classic.html + dist/index.html to repo root for GitHub Pages.");
