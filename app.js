@@ -472,6 +472,7 @@
     }
 
     function renderTabs() {
+        if (!tabNav) return;
         tabNav.innerHTML = "";
         if (state.path && state.path.length > 1) {
             const back = document.createElement("button");
@@ -589,6 +590,7 @@
     }
 
     function showNotification(data) {
+        if (!notifWrap) return;
         const el = document.createElement("div");
         el.className = "notification " + (data.type || "info");
         el.innerHTML = `<div class="notification-title">${escapeHtml(data.title || "Notice")}</div>
@@ -602,6 +604,7 @@
     }
 
     function renderKeybinds(binds) {
+        if (!kblList) return;
         kblList.innerHTML = "";
         (binds || []).forEach((b) => {
             kblList.insertAdjacentHTML(
