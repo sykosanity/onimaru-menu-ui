@@ -343,6 +343,12 @@
         render();
     }
 
+    function emitActivate(index, entry) {
+        const payload = { action: "activate", index };
+        if (entry?.label) payload.label = entry.label;
+        emitToGame(payload);
+    }
+
     function toggleAtIndex(index) {
         mutateActiveTabs((tabs) => {
             const tab = tabs[index];
@@ -352,7 +358,8 @@
             }
         });
         state.index = index;
-        emitToGame({ action: "activate", index });
+        const tab = getActiveTabs()[index];
+        emitActivate(index, tab);
         render();
     }
 
@@ -377,9 +384,9 @@
                     state.elements = entry.subTabs;
                 }
                 state.index = 0;
-                emitToGame({ action: "activate", index });
+                emitActivate(index, entry);
             } else {
-                emitToGame({ action: "activate", index });
+                emitActivate(index, entry);
             }
             render();
             return;
@@ -391,7 +398,7 @@
         }
 
         if (entry.type === "button") {
-            emitToGame({ action: "activate", index });
+            emitActivate(index, entry);
             if (isLocalDevMode()) {
                 showNotification({
                     type: "success",
@@ -403,7 +410,7 @@
             return;
         }
 
-        emitToGame({ action: "activate", index });
+        emitActivate(index, entry);
     }
 
     function emitToGame(payload) {
