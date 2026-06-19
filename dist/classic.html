@@ -161,6 +161,10 @@
     }\r
 \r
     function openSidebarSection(label) {\r
+        if (isGameMode()) {\r
+            emitToGame({ action: "openSidebar", label });\r
+            return;\r
+        }\r
         if (!loadSidebarSection(label)) return;\r
         const menuIdx = findSidebarMenuIndex(label);\r
         state.path = ["Onimaru", label];\r
@@ -201,10 +205,25 @@
         const tabs = getActiveTabs();\r
         if (!tabs.length) return;\r
         if (tabs[index]?.type === "divider") return;\r
+        if (isGameMode()) {\r
+            emitToGame({ action: "select", index });\r
+            return;\r
+        }\r
         state.index = index;\r
         emitToGame({ action: "select", index });\r
-        if (isLocalDevMode()) processMessage({ action: "keydown", index: state.index });\r
-        else render();\r
+        processMessage({ action: "keydown", index: state.index });\r
+    }\r
+\r
+    function switchCategory(index) {\r
+        if (!state.categories || !state.categories.length) return;\r
+        if (isGameMode()) {\r
+            emitToGame({ action: "category", index });\r
+            return;\r
+        }\r
+        state.categoryIndex = index;\r
+        state.elements = state.categories[index].tabs || [];\r
+        state.index = 0;\r
+        afterLocalChange({ action: "category", index });\r
     }\r
 \r
     function rowActivatesOnClick(entry) {\r
@@ -219,15 +238,15 @@
         );\r
     }\r
 \r
-    function switchCategory(index) {\r
-        if (!state.categories || !state.categories.length) return;\r
-        state.categoryIndex = index;\r
-        state.elements = state.categories[index].tabs || [];\r
-        state.index = 0;\r
-        afterLocalChange({ action: "category", index });\r
-    }\r
-\r
     function adjustScrollable(index, dir) {\r
+        if (isGameMode()) {\r
+            emitToGame({\r
+                action: "scroll",\r
+                index,\r
+                dir: dir < 0 ? "left" : "right",\r
+            });\r
+            return;\r
+        }\r
         mutateActiveTabs((tabs) => {\r
             const tab = tabs[index];\r
             if (!tab || !tab.values?.length) return;\r
@@ -247,6 +266,16 @@
 \r
     function adjustSlider(index, clientX, trackEl, opts) {\r
         const commit = !opts || opts.commit !== false;\r
+        if (isGameMode()) {\r
+            if (!commit) return;\r
+            const tab = getActiveTabs()[index];\r
+            const min = tab?.min ?? 0;\r
+            const max = tab?.max ?? 100;\r
+            const rect = trackEl.getBoundingClientRect();\r
+            const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));\r
+            emitToGame({ action: "slider", index, pct });\r
+            return;\r
+        }\r
         mutateActiveTabs((tabs) => {\r
             const tab = tabs[index];\r
             if (!tab) return;\r
@@ -273,6 +302,10 @@
     }\r
 \r
     function toggleAtIndex(index) {\r
+        if (isGameMode()) {\r
+            gameActivate(index);\r
+            return;\r
+        }\r
         mutateActiveTabs((tabs) => {\r
             const tab = tabs[index];\r
             if (!tab) return;\r
@@ -285,6 +318,11 @@
     }\r
 \r
     function activateAtIndex(index) {\r
+        if (isGameMode()) {\r
+            gameActivate(index);\r
+            return;\r
+        }\r
+\r
         const list = state.categories?.length\r
             ? state.categories[state.categoryIndex].tabs\r
             : state.elements;\r
@@ -320,14 +358,12 @@
 \r
         if (entry.type === "button") {\r
             afterLocalChange({ action: "activate", index });\r
-            if (isLocalDevMode()) {\r
-                showNotification({\r
-                    type: "success",\r
-                    title: entry.label || "Action",\r
-                    desc: "Triggered (dev preview)",\r
-                    duration: 2000,\r
-                });\r
-            }\r
+            showNotification({\r
+                type: "success",\r
+                title: entry.label || "Action",\r
+                desc: "Triggered (dev preview)",\r
+                duration: 2000,\r
+            });\r
             return;\r
         }\r
 \r
@@ -372,7 +408,10 @@
     function afterLocalChange(gamePayload) {\r
         emitToGame(gamePayload);\r
         if (isLocalDevMode()) pushUpdate();\r
-        else render();\r
+    }\r
+\r
+    function gameActivate(index) {\r
+        emitToGame({ action: "activate", index });\r
     }\r
 \r
     function renderControl(entry) {\r
@@ -593,7 +632,9 @@
         if (data.sidebar) state.sidebar = data.sidebar;\r
         if (data.sidebarActive !== undefined) state.sidebarActive = data.sidebarActive;\r
         if (data.bannerColor) setMenuColor(data.bannerColor);\r
-        ensureSidebarContent();\r
+        if (data.action === "showUI" && data.visible) {\r
+            ensureSidebarContent();\r
+        }\r
     }\r
 \r
     function showNotification(data) {\r
@@ -643,12 +684,36 @@
         return null;\r
     }\r
 \r
+    function synthesizeMenuClick(px, py) {\r
+        const selectors =\r
+            ".nav-item, .tab-item, .submenu-card, .feature-row, .toggle, .scroll-ctrl, .slider-track, .btn-pill";\r
+        const stack = document.elementsFromPoint(px, py) || [];\r
+        for (const el of stack) {\r
+            const target = el.closest?.(selectors);\r
+            if (target && dashboard.contains(target)) {\r
+                target.click();\r
+                return true;\r
+            }\r
+        }\r
+        return false;\r
+    }\r
+\r
     function bindInteractions() {\r
         if (dashboard.dataset.bound === "1") return;\r
         dashboard.dataset.bound = "1";\r
 \r
+        let lastClickAt = 0;\r
+\r
         dashboard.addEventListener("click", (e) => {\r
             if (!state.visible) return;\r
+\r
+            const now = Date.now();\r
+            if (now - lastClickAt < 280) {\r
+                e.preventDefault();\r
+                e.stopPropagation();\r
+                return;\r
+            }\r
+            lastClickAt = now;\r
 \r
             const toggle = e.target.closest(".toggle");\r
             if (toggle) {\r
@@ -754,23 +819,25 @@
             sliderDrag = null;\r
         });\r
 \r
-        dashboard.addEventListener("dblclick", (e) => {\r
-            if (!state.visible) return;\r
-            const row = e.target.closest(".feature-row");\r
-            if (row) {\r
-                activateAtIndex(parseInt(row.dataset.idx, 10));\r
-                return;\r
-            }\r
-            const subCard = e.target.closest(".submenu-card");\r
-            if (subCard) {\r
-                activateAtIndex(parseInt(subCard.dataset.idx, 10));\r
-                return;\r
-            }\r
-            const nav = e.target.closest(".nav-item");\r
-            if (nav?.dataset.sidebar) {\r
-                openSidebarSection(nav.dataset.sidebar);\r
-            }\r
-        });\r
+        if (isLocalDevMode()) {\r
+            dashboard.addEventListener("dblclick", (e) => {\r
+                if (!state.visible) return;\r
+                const row = e.target.closest(".feature-row");\r
+                if (row) {\r
+                    activateAtIndex(parseInt(row.dataset.idx, 10));\r
+                    return;\r
+                }\r
+                const subCard = e.target.closest(".submenu-card");\r
+                if (subCard) {\r
+                    activateAtIndex(parseInt(subCard.dataset.idx, 10));\r
+                    return;\r
+                }\r
+                const nav = e.target.closest(".nav-item");\r
+                if (nav?.dataset.sidebar) {\r
+                    openSidebarSection(nav.dataset.sidebar);\r
+                }\r
+            });\r
+        }\r
     }\r
 \r
     window.addEventListener("message", (event) => {\r
@@ -842,6 +909,10 @@
         return host === "localhost" || host === "127.0.0.1" || host === "";\r
     }\r
 \r
+    function isGameMode() {\r
+        return !isLocalDevMode();\r
+    }\r
+\r
     function processMessage(data) {\r
         if (!data || !data.action) return;\r
 \r
@@ -888,8 +959,7 @@
                     gc.style.top = py + "px";\r
                 }\r
                 if (data.type === "up" || data.type === "click") {\r
-                    const hit = document.elementFromPoint(px, py);\r
-                    if (hit) hit.click();\r
+                    synthesizeMenuClick(px, py);\r
                 }\r
                 break;\r
             }\r

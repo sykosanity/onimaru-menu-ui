@@ -155,6 +155,10 @@
     }
 
     function openSidebarSection(label) {
+        if (isGameMode()) {
+            emitToGame({ action: "openSidebar", label });
+            return;
+        }
         if (!loadSidebarSection(label)) return;
         const menuIdx = findSidebarMenuIndex(label);
         state.path = ["Onimaru", label];
@@ -195,10 +199,25 @@
         const tabs = getActiveTabs();
         if (!tabs.length) return;
         if (tabs[index]?.type === "divider") return;
+        if (isGameMode()) {
+            emitToGame({ action: "select", index });
+            return;
+        }
         state.index = index;
         emitToGame({ action: "select", index });
-        if (isLocalDevMode()) processMessage({ action: "keydown", index: state.index });
-        else render();
+        processMessage({ action: "keydown", index: state.index });
+    }
+
+    function switchCategory(index) {
+        if (!state.categories || !state.categories.length) return;
+        if (isGameMode()) {
+            emitToGame({ action: "category", index });
+            return;
+        }
+        state.categoryIndex = index;
+        state.elements = state.categories[index].tabs || [];
+        state.index = 0;
+        afterLocalChange({ action: "category", index });
     }
 
     function rowActivatesOnClick(entry) {
@@ -213,15 +232,15 @@
         );
     }
 
-    function switchCategory(index) {
-        if (!state.categories || !state.categories.length) return;
-        state.categoryIndex = index;
-        state.elements = state.categories[index].tabs || [];
-        state.index = 0;
-        afterLocalChange({ action: "category", index });
-    }
-
     function adjustScrollable(index, dir) {
+        if (isGameMode()) {
+            emitToGame({
+                action: "scroll",
+                index,
+                dir: dir < 0 ? "left" : "right",
+            });
+            return;
+        }
         mutateActiveTabs((tabs) => {
             const tab = tabs[index];
             if (!tab || !tab.values?.length) return;
@@ -241,6 +260,16 @@
 
     function adjustSlider(index, clientX, trackEl, opts) {
         const commit = !opts || opts.commit !== false;
+        if (isGameMode()) {
+            if (!commit) return;
+            const tab = getActiveTabs()[index];
+            const min = tab?.min ?? 0;
+            const max = tab?.max ?? 100;
+            const rect = trackEl.getBoundingClientRect();
+            const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+            emitToGame({ action: "slider", index, pct });
+            return;
+        }
         mutateActiveTabs((tabs) => {
             const tab = tabs[index];
             if (!tab) return;
@@ -267,6 +296,10 @@
     }
 
     function toggleAtIndex(index) {
+        if (isGameMode()) {
+            gameActivate(index);
+            return;
+        }
         mutateActiveTabs((tabs) => {
             const tab = tabs[index];
             if (!tab) return;
@@ -279,6 +312,11 @@
     }
 
     function activateAtIndex(index) {
+        if (isGameMode()) {
+            gameActivate(index);
+            return;
+        }
+
         const list = state.categories?.length
             ? state.categories[state.categoryIndex].tabs
             : state.elements;
@@ -314,14 +352,12 @@
 
         if (entry.type === "button") {
             afterLocalChange({ action: "activate", index });
-            if (isLocalDevMode()) {
-                showNotification({
-                    type: "success",
-                    title: entry.label || "Action",
-                    desc: "Triggered (dev preview)",
-                    duration: 2000,
-                });
-            }
+            showNotification({
+                type: "success",
+                title: entry.label || "Action",
+                desc: "Triggered (dev preview)",
+                duration: 2000,
+            });
             return;
         }
 
@@ -366,7 +402,10 @@
     function afterLocalChange(gamePayload) {
         emitToGame(gamePayload);
         if (isLocalDevMode()) pushUpdate();
-        else render();
+    }
+
+    function gameActivate(index) {
+        emitToGame({ action: "activate", index });
     }
 
     function renderControl(entry) {
@@ -587,7 +626,9 @@
         if (data.sidebar) state.sidebar = data.sidebar;
         if (data.sidebarActive !== undefined) state.sidebarActive = data.sidebarActive;
         if (data.bannerColor) setMenuColor(data.bannerColor);
-        ensureSidebarContent();
+        if (data.action === "showUI" && data.visible) {
+            ensureSidebarContent();
+        }
     }
 
     function showNotification(data) {
@@ -637,12 +678,36 @@
         return null;
     }
 
+    function synthesizeMenuClick(px, py) {
+        const selectors =
+            ".nav-item, .tab-item, .submenu-card, .feature-row, .toggle, .scroll-ctrl, .slider-track, .btn-pill";
+        const stack = document.elementsFromPoint(px, py) || [];
+        for (const el of stack) {
+            const target = el.closest?.(selectors);
+            if (target && dashboard.contains(target)) {
+                target.click();
+                return true;
+            }
+        }
+        return false;
+    }
+
     function bindInteractions() {
         if (dashboard.dataset.bound === "1") return;
         dashboard.dataset.bound = "1";
 
+        let lastClickAt = 0;
+
         dashboard.addEventListener("click", (e) => {
             if (!state.visible) return;
+
+            const now = Date.now();
+            if (now - lastClickAt < 280) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            lastClickAt = now;
 
             const toggle = e.target.closest(".toggle");
             if (toggle) {
@@ -748,23 +813,25 @@
             sliderDrag = null;
         });
 
-        dashboard.addEventListener("dblclick", (e) => {
-            if (!state.visible) return;
-            const row = e.target.closest(".feature-row");
-            if (row) {
-                activateAtIndex(parseInt(row.dataset.idx, 10));
-                return;
-            }
-            const subCard = e.target.closest(".submenu-card");
-            if (subCard) {
-                activateAtIndex(parseInt(subCard.dataset.idx, 10));
-                return;
-            }
-            const nav = e.target.closest(".nav-item");
-            if (nav?.dataset.sidebar) {
-                openSidebarSection(nav.dataset.sidebar);
-            }
-        });
+        if (isLocalDevMode()) {
+            dashboard.addEventListener("dblclick", (e) => {
+                if (!state.visible) return;
+                const row = e.target.closest(".feature-row");
+                if (row) {
+                    activateAtIndex(parseInt(row.dataset.idx, 10));
+                    return;
+                }
+                const subCard = e.target.closest(".submenu-card");
+                if (subCard) {
+                    activateAtIndex(parseInt(subCard.dataset.idx, 10));
+                    return;
+                }
+                const nav = e.target.closest(".nav-item");
+                if (nav?.dataset.sidebar) {
+                    openSidebarSection(nav.dataset.sidebar);
+                }
+            });
+        }
     }
 
     window.addEventListener("message", (event) => {
@@ -836,6 +903,10 @@
         return host === "localhost" || host === "127.0.0.1" || host === "";
     }
 
+    function isGameMode() {
+        return !isLocalDevMode();
+    }
+
     function processMessage(data) {
         if (!data || !data.action) return;
 
@@ -882,8 +953,7 @@
                     gc.style.top = py + "px";
                 }
                 if (data.type === "up" || data.type === "click") {
-                    const hit = document.elementFromPoint(px, py);
-                    if (hit) hit.click();
+                    synthesizeMenuClick(px, py);
                 }
                 break;
             }
