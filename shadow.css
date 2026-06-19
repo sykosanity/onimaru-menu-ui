@@ -528,6 +528,11 @@ body.menu-open #game-cursor {
     flex-shrink: 0;
 }
 
+.feature-actions .slider-wrap {
+    min-width: 88px;
+    max-width: 130px;
+}
+
 .row-menu-btn {
     width: 28px;
     height: 28px;

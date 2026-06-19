@@ -227,21 +227,38 @@
         );
     }
 
-    function handleFeatureRowClick(idx, x, y, row) {
+    function handleFeatureRowClick(idx, x, y, row, clickTarget) {
         const entry = getActiveTabs()[idx];
         if (!entry || entry.type === "divider") return;
 
         state.index = idx;
+        const t = clickTarget || null;
 
-        if (entry.type === "slider" || entry.type === "slider-checkbox") {
+        if (entry.type === "slider-checkbox") {
+            if (t && t.closest(".toggle")) {
+                toggleAtIndex(idx);
+                return;
+            }
+            const track = row.querySelector(".slider-track");
+            if (track && t && (t.closest(".slider-wrap") || t.closest(".slider-track") || t.closest(".slider-num"))) {
+                adjustSlider(idx, x, track);
+                return;
+            }
+            toggleAtIndex(idx);
+            return;
+        }
+
+        if (entry.type === "slider") {
             const track = row.querySelector(".slider-track");
             if (track) {
                 adjustSlider(idx, x, track);
                 return;
             }
+            activateAtIndex(idx);
+            return;
         }
 
-        if (entry.type === "checkbox" || entry.type === "slider-checkbox" || entry.type === "scrollable-checkbox") {
+        if (entry.type === "checkbox" || entry.type === "scrollable-checkbox") {
             toggleAtIndex(idx);
             return;
         }
@@ -265,6 +282,7 @@
             [".scroll-ctrl", "scroll"],
             [".scroll-value", "scroll-value"],
             [".slider-track", "slider"],
+            [".slider-num", "slider-num"],
             [".btn-pill", "pill"],
             [".tab-item", "tab"],
             [".nav-item", "nav"],
@@ -537,6 +555,16 @@
             return true;
         }
 
+        if (kind === "slider-num") {
+            const row = target.closest(".feature-row");
+            if (!row) return false;
+            const track = row.querySelector(".slider-track");
+            if (track) {
+                adjustSlider(parseInt(row.dataset.idx, 10), x, track);
+            }
+            return true;
+        }
+
         if (kind === "pill") {
             const row = target.closest(".feature-row");
             if (row) activateAtIndex(parseInt(row.dataset.idx, 10));
@@ -563,7 +591,7 @@
         }
 
         if (kind === "row") {
-            handleFeatureRowClick(parseInt(target.dataset.idx, 10), x, y, target);
+            handleFeatureRowClick(parseInt(target.dataset.idx, 10), x, y, target, target);
             return true;
         }
 
@@ -677,6 +705,20 @@
         if (isLocalDevMode()) pushUpdate();
     }
 
+    function renderSliderWrap(entry) {
+        const min = entry.min ?? 0;
+        const max = entry.max ?? 100;
+        const val = entry.value ?? min;
+        const pct = max === min ? 0 : ((val - min) / (max - min)) * 100;
+        return `<div class="slider-wrap">
+                <div class="slider-track" role="slider" aria-valuenow="${val}" aria-valuemin="${min}" aria-valuemax="${max}">
+                    <div class="slider-fill" style="width:${pct}%"></div>
+                    <div class="slider-thumb" style="left:${pct}%"></div>
+                </div>
+                <span class="slider-num">${formatSliderValue(entry)}</span>
+            </div>`;
+    }
+
     function renderControl(entry) {
         const type = entry.type || "button";
         if (type === "checkbox" || type === "scrollable-checkbox" || type === "slider-checkbox") {
@@ -687,22 +729,12 @@
                     <span class="scroll-value">${escapeHtml(scrollableLabel(entry))}</span>
                     <button type="button" class="scroll-ctrl" data-dir="right" title="Next">›</button>`;
             } else if (type === "slider-checkbox") {
-                extra = `<span class="slider-num">${formatSliderValue(entry)}</span>`;
+                extra = renderSliderWrap(entry);
             }
             return `${extra}<button type="button" class="toggle ${on ? "on" : ""}" aria-pressed="${on}"></button>`;
         }
         if (type === "slider") {
-            const min = entry.min ?? 0;
-            const max = entry.max ?? 100;
-            const val = entry.value ?? min;
-            const pct = max === min ? 0 : ((val - min) / (max - min)) * 100;
-            return `<div class="slider-wrap">
-                <div class="slider-track" role="slider" aria-valuenow="${val}" aria-valuemin="${min}" aria-valuemax="${max}">
-                    <div class="slider-fill" style="width:${pct}%"></div>
-                    <div class="slider-thumb" style="left:${pct}%"></div>
-                </div>
-                <span class="slider-num">${formatSliderValue(entry)}</span>
-            </div>`;
+            return renderSliderWrap(entry);
         }
         if (type === "scrollable") {
             return `<button type="button" class="scroll-ctrl" data-dir="left" title="Previous">‹</button>
@@ -1006,6 +1038,18 @@
                 return;
             }
 
+            const sliderNum = e.target.closest(".slider-num");
+            if (sliderNum) {
+                e.stopPropagation();
+                const row = sliderNum.closest(".feature-row");
+                if (!row) return;
+                const trackEl = row.querySelector(".slider-track");
+                if (trackEl) {
+                    adjustSlider(parseInt(row.dataset.idx, 10), e.clientX, trackEl);
+                }
+                return;
+            }
+
             const btnPill = e.target.closest(".btn-pill");
             if (btnPill) {
                 e.stopPropagation();
@@ -1038,7 +1082,7 @@
 
             const row = e.target.closest(".feature-row");
             if (row) {
-                handleFeatureRowClick(parseInt(row.dataset.idx, 10), e.clientX, e.clientY, row);
+                handleFeatureRowClick(parseInt(row.dataset.idx, 10), e.clientX, e.clientY, row, e.target);
                 return;
             }
         });
