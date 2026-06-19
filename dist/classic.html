@@ -582,6 +582,7 @@
     }\r
 \r
     function applyPayload(data) {\r
+        if (typeof data.visible === "boolean") state.visible = data.visible;\r
         if (typeof data.username === "string") state.username = data.username;\r
         if (data.elements) state.elements = data.elements;\r
         if (typeof data.index === "number") state.index = data.index;\r
@@ -886,13 +887,16 @@
             case "updateBanner":\r
                 if (data.bannerColor) setMenuColor(data.bannerColor);\r
                 break;\r
-            case "updateKeyboard":\r
-                inputWrap.classList.toggle("visible", !!data.visible);\r
-                if (data.title) inputTitle.textContent = data.title;\r
-                if (data.value !== undefined) {\r
+            case "updateKeyboard": {\r
+                const show = !!data.visible;\r
+                document.body.classList.toggle("keyboard-prompt", show);\r
+                if (inputWrap) inputWrap.classList.toggle("visible", show);\r
+                if (show && inputTitle && data.title) inputTitle.textContent = data.title;\r
+                if (show && inputValue) {\r
                     inputValue.textContent = data.value || "Press any key…";\r
                 }\r
                 break;\r
+            }\r
             case "displayBinds":\r
                 kblWrap.classList.toggle("visible", !!data.visible);\r
                 if (data.binds) renderKeybinds(data.binds);\r

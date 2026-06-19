@@ -576,6 +576,7 @@
     }
 
     function applyPayload(data) {
+        if (typeof data.visible === "boolean") state.visible = data.visible;
         if (typeof data.username === "string") state.username = data.username;
         if (data.elements) state.elements = data.elements;
         if (typeof data.index === "number") state.index = data.index;
@@ -880,13 +881,16 @@
             case "updateBanner":
                 if (data.bannerColor) setMenuColor(data.bannerColor);
                 break;
-            case "updateKeyboard":
-                inputWrap.classList.toggle("visible", !!data.visible);
-                if (data.title) inputTitle.textContent = data.title;
-                if (data.value !== undefined) {
+            case "updateKeyboard": {
+                const show = !!data.visible;
+                document.body.classList.toggle("keyboard-prompt", show);
+                if (inputWrap) inputWrap.classList.toggle("visible", show);
+                if (show && inputTitle && data.title) inputTitle.textContent = data.title;
+                if (show && inputValue) {
                     inputValue.textContent = data.value || "Press any key…";
                 }
                 break;
+            }
             case "displayBinds":
                 kblWrap.classList.toggle("visible", !!data.visible);
                 if (data.binds) renderKeybinds(data.binds);
