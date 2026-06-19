@@ -4,49 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Onimaru Menu</title>
-    <style>
-      #boot-keybind-fallback {
-        position: fixed;
-        inset: 0;
-        z-index: 99999;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(6, 4, 12, 0.92);
-        font-family: "Segoe UI", Inter, system-ui, sans-serif;
-        color: #f4f2f8;
-        pointer-events: none;
-      }
-      #boot-keybind-fallback .boot-keybind-card {
-        text-align: center;
-        padding: 28px 36px;
-        border-radius: 14px;
-        border: 1px solid rgba(139, 92, 246, 0.35);
-        background: rgba(18, 14, 28, 0.98);
-        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
-        max-width: min(440px, 90vw);
-      }
-      #boot-keybind-fallback strong { display: block; font-size: 18px; margin-bottom: 10px; color: rgb(139, 92, 246); }
-      #boot-keybind-fallback p { font-size: 14px; line-height: 1.5; color: #9b94ad; margin: 0 0 16px; }
-      #boot-key-value {
-        font-size: 16px;
-        font-weight: 600;
-        padding: 12px 16px;
-        border-radius: 10px;
-        background: rgba(139, 92, 246, 0.12);
-        border: 1px solid rgba(139, 92, 246, 0.25);
-      }
-    </style>
 </head>
 <body>
-    <div id="boot-keybind-fallback" aria-live="polite">
-      <div class="boot-keybind-card">
-        <strong>Choose Menu Key</strong>
-        <p>Press any key on your keyboard to set the key that opens the menu.</p>
-        <div id="boot-key-value">Waiting for key…</div>
-      </div>
-    </div>
-
     <div id="page-error" style="display:none">
       <div><strong>Onimaru UI failed to load</strong></div>
     </div>
@@ -101,25 +60,6 @@
           else window.__ONIMARU_PENDING__.push(p);
         },
       };
-      window.machoPost = window.machoPost || function (payload) {
-        try { if (typeof invokeNative === "function") invokeNative("duiCallback", payload); } catch (e) {}
-        try { if (typeof invokeNative === "function") invokeNative("onimaruUi", payload); } catch (e) {}
-        try { if (typeof invokeNative === "function") invokeNative("sendDuiMessage", payload); } catch (e) {}
-      };
-      window.addEventListener("keydown", function (e) {
-        var boot = document.getElementById("boot-keybind-fallback");
-        var inp = document.getElementById("input-wrapper");
-        if (!boot && !(inp && inp.classList.contains("visible"))) return;
-        if (e.repeat) return;
-        var k = e.key;
-        if (!k || k === "Control" || k === "Alt" || k === "Meta") return;
-        e.preventDefault();
-        var label = k === "Shift" ? "Shift" : k.length === 1 ? k.toUpperCase() : k;
-        var bootVal = document.getElementById("boot-key-value");
-        if (bootVal) bootVal.textContent = label;
-        var raw = JSON.stringify({ source: "onimaru-ui", action: "keybindPick", key: label, code: e.keyCode || e.which || 0 });
-        try { if (window.machoPost) window.machoPost(raw); } catch (ex) {}
-      }, true);
     </script>
     <script type="module" src="/src/classic-main.ts"></script>
 </body>

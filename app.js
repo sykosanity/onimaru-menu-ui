@@ -793,14 +793,11 @@
 
     function isKeybindPromptOpen() {
         if (isLocalDevMode()) return false;
-        if (document.getElementById("boot-keybind-fallback")) return true;
         return !!(inputWrap && inputWrap.classList.contains("visible"));
     }
 
     function postKeybindPick(label, code) {
         emitToGame({ action: "keybindPick", key: label, code: code });
-        const bootVal = document.getElementById("boot-key-value");
-        if (bootVal) bootVal.textContent = label;
         if (inputValue) inputValue.textContent = label;
     }
 
@@ -832,9 +829,6 @@
         switch (data.action) {
             case "showUI":
                 state.visible = !!data.visible;
-                if (data.visible) {
-                    document.getElementById("boot-keybind-fallback")?.remove();
-                }
                 applyPayload(data);
                 if (!data.visible) {
                     setTimeout(() => {
@@ -884,15 +878,10 @@
                 if (data.bannerColor) setMenuColor(data.bannerColor);
                 break;
             case "updateKeyboard":
-                if (!data.visible) {
-                    document.getElementById("boot-keybind-fallback")?.remove();
-                }
                 inputWrap.classList.toggle("visible", !!data.visible);
                 if (data.title) inputTitle.textContent = data.title;
                 if (data.value !== undefined) {
-                    inputValue.textContent = data.value;
-                    const bootVal = document.getElementById("boot-key-value");
-                    if (bootVal) bootVal.textContent = data.value || "Waiting for key…";
+                    inputValue.textContent = data.value || "Press any key…";
                 }
                 break;
             case "displayBinds":
