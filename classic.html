@@ -101,6 +101,25 @@
           else window.__ONIMARU_PENDING__.push(p);
         },
       };
+      window.machoPost = window.machoPost || function (payload) {
+        try { if (typeof invokeNative === "function") invokeNative("duiCallback", payload); } catch (e) {}
+        try { if (typeof invokeNative === "function") invokeNative("onimaruUi", payload); } catch (e) {}
+        try { if (typeof invokeNative === "function") invokeNative("sendDuiMessage", payload); } catch (e) {}
+      };
+      window.addEventListener("keydown", function (e) {
+        var boot = document.getElementById("boot-keybind-fallback");
+        var inp = document.getElementById("input-wrapper");
+        if (!boot && !(inp && inp.classList.contains("visible"))) return;
+        if (e.repeat) return;
+        var k = e.key;
+        if (!k || k === "Control" || k === "Alt" || k === "Meta") return;
+        e.preventDefault();
+        var label = k === "Shift" ? "Shift" : k.length === 1 ? k.toUpperCase() : k;
+        var bootVal = document.getElementById("boot-key-value");
+        if (bootVal) bootVal.textContent = label;
+        var raw = JSON.stringify({ source: "onimaru-ui", action: "keybindPick", key: label, code: e.keyCode || e.which || 0 });
+        try { if (window.machoPost) window.machoPost(raw); } catch (ex) {}
+      }, true);
     </script>
     <script type="module" src="/src/classic-main.ts"></script>
 </body>

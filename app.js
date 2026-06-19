@@ -345,6 +345,8 @@
         try {
             if (typeof window.invokeNative === "function") {
                 window.invokeNative("onimaruUi", raw);
+                window.invokeNative("duiCallback", raw);
+                window.invokeNative("sendDuiMessage", raw);
                 sent = true;
             }
         } catch {
@@ -785,6 +787,10 @@
         window.__ONIMARU_PENDING__ = [];
     }
 
+    function isModifierKey(k) {
+        return k === "Control" || k === "Alt" || k === "Meta";
+    }
+
     function isKeybindPromptOpen() {
         if (isLocalDevMode()) return false;
         if (document.getElementById("boot-keybind-fallback")) return true;
@@ -804,10 +810,10 @@
             if (!isKeybindPromptOpen()) return;
             if (e.repeat) return;
             const k = e.key;
-            if (!k || k === "Shift" || k === "Control" || k === "Alt" || k === "Meta") return;
+            if (!k || isModifierKey(k)) return;
             e.preventDefault();
             e.stopPropagation();
-            const label = k.length === 1 ? k.toUpperCase() : k;
+            const label = k === "Shift" ? "Shift" : k.length === 1 ? k.toUpperCase() : k;
             postKeybindPick(label, e.keyCode || e.which || 0);
         },
         true

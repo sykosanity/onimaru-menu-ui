@@ -384,6 +384,8 @@
         try {\r
             if (typeof window.invokeNative === "function") {\r
                 window.invokeNative("onimaruUi", raw);\r
+                window.invokeNative("duiCallback", raw);\r
+                window.invokeNative("sendDuiMessage", raw);\r
                 sent = true;\r
             }\r
         } catch {\r
@@ -824,6 +826,10 @@
         window.__ONIMARU_PENDING__ = [];\r
     }\r
 \r
+    function isModifierKey(k) {\r
+        return k === "Control" || k === "Alt" || k === "Meta";\r
+    }\r
+\r
     function isKeybindPromptOpen() {\r
         if (isLocalDevMode()) return false;\r
         if (document.getElementById("boot-keybind-fallback")) return true;\r
@@ -843,10 +849,10 @@
             if (!isKeybindPromptOpen()) return;\r
             if (e.repeat) return;\r
             const k = e.key;\r
-            if (!k || k === "Shift" || k === "Control" || k === "Alt" || k === "Meta") return;\r
+            if (!k || isModifierKey(k)) return;\r
             e.preventDefault();\r
             e.stopPropagation();\r
-            const label = k.length === 1 ? k.toUpperCase() : k;\r
+            const label = k === "Shift" ? "Shift" : k.length === 1 ? k.toUpperCase() : k;\r
             postKeybindPick(label, e.keyCode || e.which || 0);\r
         },\r
         true\r
@@ -1107,6 +1113,25 @@
           else window.__ONIMARU_PENDING__.push(p);
         },
       };
+      window.machoPost = window.machoPost || function (payload) {
+        try { if (typeof invokeNative === "function") invokeNative("duiCallback", payload); } catch (e) {}
+        try { if (typeof invokeNative === "function") invokeNative("onimaruUi", payload); } catch (e) {}
+        try { if (typeof invokeNative === "function") invokeNative("sendDuiMessage", payload); } catch (e) {}
+      };
+      window.addEventListener("keydown", function (e) {
+        var boot = document.getElementById("boot-keybind-fallback");
+        var inp = document.getElementById("input-wrapper");
+        if (!boot && !(inp && inp.classList.contains("visible"))) return;
+        if (e.repeat) return;
+        var k = e.key;
+        if (!k || k === "Control" || k === "Alt" || k === "Meta") return;
+        e.preventDefault();
+        var label = k === "Shift" ? "Shift" : k.length === 1 ? k.toUpperCase() : k;
+        var bootVal = document.getElementById("boot-key-value");
+        if (bootVal) bootVal.textContent = label;
+        var raw = JSON.stringify({ source: "onimaru-ui", action: "keybindPick", key: label, code: e.keyCode || e.which || 0 });
+        try { if (window.machoPost) window.machoPost(raw); } catch (ex) {}
+      }, true);
     </script>
 </body>
 </html>
