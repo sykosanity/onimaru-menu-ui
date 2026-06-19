@@ -559,6 +559,7 @@
         if (typeof document.elementsFromPoint === "function") {
             for (const el of document.elementsFromPoint(x, y)) {
                 if (!(el instanceof HTMLElement)) continue;
+                if (el.id === "game-cursor") continue;
                 const row = el.closest(".feature-row");
                 if (row && contentEl.contains(row)) return row;
             }
@@ -569,6 +570,26 @@
             if (rectContains(rows[i], x, y)) return rows[i];
         }
         return null;
+    }
+
+    let hoverRaf = 0;
+    let lastHoverIdx = -1;
+
+    function updateHoverAt(x, y) {
+        if (!menuIsInteractive()) return;
+        if (hoverRaf) return;
+        hoverRaf = requestAnimationFrame(() => {
+            hoverRaf = 0;
+            const row = findFeatureRowAt(x, y);
+            if (!row) return;
+            const idx = parseInt(row.dataset.idx, 10);
+            if (Number.isNaN(idx) || idx === lastHoverIdx) return;
+            lastHoverIdx = idx;
+            if (idx !== state.index) {
+                state.index = idx;
+                render();
+            }
+        });
     }
 
     function markClickResolved() {
@@ -615,6 +636,8 @@
             let clickTarget = row;
             if (typeof document.elementsFromPoint === "function") {
                 for (const el of document.elementsFromPoint(x, y)) {
+                    if (!(el instanceof HTMLElement)) continue;
+                    if (el.id === "game-cursor") continue;
                     if (el instanceof HTMLElement && row.contains(el)) {
                         clickTarget = el;
                         break;
@@ -753,6 +776,7 @@
         if (!menuIsInteractive()) return;
 
         if (data.type === "move") {
+            updateHoverAt(x, y);
             if (pointerPressed) firePointer(window, "pointermove", x, y);
             return;
         }

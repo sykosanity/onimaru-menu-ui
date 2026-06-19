@@ -623,6 +623,7 @@
         if (typeof document.elementsFromPoint === "function") {\r
             for (const el of document.elementsFromPoint(x, y)) {\r
                 if (!(el instanceof HTMLElement)) continue;\r
+                if (el.id === "game-cursor") continue;\r
                 const row = el.closest(".feature-row");\r
                 if (row && contentEl.contains(row)) return row;\r
             }\r
@@ -633,6 +634,26 @@
             if (rectContains(rows[i], x, y)) return rows[i];\r
         }\r
         return null;\r
+    }\r
+\r
+    let hoverRaf = 0;\r
+    let lastHoverIdx = -1;\r
+\r
+    function updateHoverAt(x, y) {\r
+        if (!menuIsInteractive()) return;\r
+        if (hoverRaf) return;\r
+        hoverRaf = requestAnimationFrame(() => {\r
+            hoverRaf = 0;\r
+            const row = findFeatureRowAt(x, y);\r
+            if (!row) return;\r
+            const idx = parseInt(row.dataset.idx, 10);\r
+            if (Number.isNaN(idx) || idx === lastHoverIdx) return;\r
+            lastHoverIdx = idx;\r
+            if (idx !== state.index) {\r
+                state.index = idx;\r
+                render();\r
+            }\r
+        });\r
     }\r
 \r
     function markClickResolved() {\r
@@ -679,6 +700,8 @@
             let clickTarget = row;\r
             if (typeof document.elementsFromPoint === "function") {\r
                 for (const el of document.elementsFromPoint(x, y)) {\r
+                    if (!(el instanceof HTMLElement)) continue;\r
+                    if (el.id === "game-cursor") continue;\r
                     if (el instanceof HTMLElement && row.contains(el)) {\r
                         clickTarget = el;\r
                         break;\r
@@ -817,6 +840,7 @@
         if (!menuIsInteractive()) return;\r
 \r
         if (data.type === "move") {\r
+            updateHoverAt(x, y);\r
             if (pointerPressed) firePointer(window, "pointermove", x, y);\r
             return;\r
         }\r
