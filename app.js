@@ -1,4 +1,5 @@
 (function () {
+    function boot() {
     const ICONS = {
         self: "◎",
         player: "◎",
@@ -312,6 +313,9 @@
             [".btn-pill", "pill"],
             [".slider-track", "slider"],
             [".scroll-ctrl", "scroll"],
+            [".tab-item", "tab"],
+            [".nav-item", "nav"],
+            [".submenu-card", "subcard"],
             [".feature-row", "row"],
         ];
         for (const [selector, kind] of rectPairs) {
@@ -551,11 +555,24 @@
 
     function findFeatureRowAt(x, y) {
         if (!contentEl) return null;
+
+        if (typeof document.elementsFromPoint === "function") {
+            for (const el of document.elementsFromPoint(x, y)) {
+                if (!(el instanceof HTMLElement)) continue;
+                const row = el.closest(".feature-row");
+                if (row && contentEl.contains(row)) return row;
+            }
+        }
+
         const rows = contentEl.querySelectorAll(".feature-row");
         for (let i = rows.length - 1; i >= 0; i--) {
             if (rectContains(rows[i], x, y)) return rows[i];
         }
         return null;
+    }
+
+    function markClickResolved() {
+        window.__ONIMARU_CLICK_RESOLVED__ = true;
     }
 
     function resolveMenuActionAt(x, y) {
@@ -567,6 +584,7 @@
         const hit = findMenuTargetAt(x, y);
         if (hit && (hit.kind === "tab" || hit.kind === "nav" || hit.kind === "subcard")) {
             lastUiClickAt = now;
+            markClickResolved();
             const { kind, target } = hit;
 
             if (kind === "tab") {
@@ -592,6 +610,7 @@
         const row = findFeatureRowAt(x, y);
         if (row) {
             lastUiClickAt = now;
+            markClickResolved();
             const idx = parseInt(row.dataset.idx, 10);
             let clickTarget = row;
             if (typeof document.elementsFromPoint === "function") {
@@ -609,6 +628,7 @@
         if (!hit) return false;
 
         lastUiClickAt = now;
+        markClickResolved();
         const { kind, target } = hit;
 
         if (kind === "toggle") {
@@ -1443,6 +1463,7 @@
 
     window.__ONIMARU_CLICK_AT__ = function (nx, ny) {
         window.__ONIMARU_LAST_MSG__ = null;
+        window.__ONIMARU_CLICK_RESOLVED__ = false;
         handleInjectedMouse({ action: "mouse", type: "click", x: nx, y: ny });
         return window.__ONIMARU_LAST_MSG__;
     };
@@ -1459,5 +1480,12 @@
         runPreviewDemo();
     } else {
         render();
+    }
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot);
+    } else {
+        boot();
     }
 })();

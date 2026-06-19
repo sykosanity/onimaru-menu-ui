@@ -3,7 +3,7 @@ import appSource from "../app.js?raw";
 
 function mountApp() {
   const target = document.body || document.documentElement;
-  if (!target) {
+  if (!target || !document.getElementById("dashboard")) {
     return;
   }
   const script = document.createElement("script");
@@ -11,8 +11,14 @@ function mountApp() {
   target.appendChild(script);
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", mountApp);
-} else {
-  mountApp();
+function scheduleMount() {
+  if (document.getElementById("dashboard")) {
+    mountApp();
+    return;
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mountApp, { once: true });
+  }
 }
+
+scheduleMount();
