@@ -161,14 +161,13 @@
     }\r
 \r
     function openSidebarSection(label) {\r
-        if (isGameMode()) {\r
-            emitToGame({ action: "openSidebar", label });\r
+        if (!loadSidebarSection(label)) {\r
+            if (isGameMode()) emitToGame({ action: "openSidebar", label });\r
             return;\r
         }\r
-        if (!loadSidebarSection(label)) return;\r
-        const menuIdx = findSidebarMenuIndex(label);\r
         state.path = ["Onimaru", label];\r
-        emitToGame({ action: "openSidebar", label, index: menuIdx >= 0 ? menuIdx : 0 });\r
+        state.sidebarActive = label;\r
+        emitToGame({ action: "openSidebar", label });\r
         render();\r
     }\r
 \r
@@ -205,25 +204,18 @@
         const tabs = getActiveTabs();\r
         if (!tabs.length) return;\r
         if (tabs[index]?.type === "divider") return;\r
-        if (isGameMode()) {\r
-            emitToGame({ action: "select", index });\r
-            return;\r
-        }\r
         state.index = index;\r
         emitToGame({ action: "select", index });\r
-        processMessage({ action: "keydown", index: state.index });\r
+        render();\r
     }\r
 \r
     function switchCategory(index) {\r
         if (!state.categories || !state.categories.length) return;\r
-        if (isGameMode()) {\r
-            emitToGame({ action: "category", index });\r
-            return;\r
-        }\r
         state.categoryIndex = index;\r
         state.elements = state.categories[index].tabs || [];\r
         state.index = 0;\r
-        afterLocalChange({ action: "category", index });\r
+        emitToGame({ action: "category", index });\r
+        render();\r
     }\r
 \r
     function rowActivatesOnClick(entry) {\r
@@ -239,14 +231,6 @@
     }\r
 \r
     function adjustScrollable(index, dir) {\r
-        if (isGameMode()) {\r
-            emitToGame({\r
-                action: "scroll",\r
-                index,\r
-                dir: dir < 0 ? "left" : "right",\r
-            });\r
-            return;\r
-        }\r
         mutateActiveTabs((tabs) => {\r
             const tab = tabs[index];\r
             if (!tab || !tab.values?.length) return;\r
@@ -262,20 +246,11 @@
             index,\r
             dir: dir < 0 ? "left" : "right",\r
         });\r
+        render();\r
     }\r
 \r
     function adjustSlider(index, clientX, trackEl, opts) {\r
         const commit = !opts || opts.commit !== false;\r
-        if (isGameMode()) {\r
-            if (!commit) return;\r
-            const tab = getActiveTabs()[index];\r
-            const min = tab?.min ?? 0;\r
-            const max = tab?.max ?? 100;\r
-            const rect = trackEl.getBoundingClientRect();\r
-            const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));\r
-            emitToGame({ action: "slider", index, pct });\r
-            return;\r
-        }\r
         mutateActiveTabs((tabs) => {\r
             const tab = tabs[index];\r
             if (!tab) return;\r
@@ -299,13 +274,10 @@
             index,\r
             value: tab?.value,\r
         });\r
+        render();\r
     }\r
 \r
     function toggleAtIndex(index) {\r
-        if (isGameMode()) {\r
-            gameActivate(index);\r
-            return;\r
-        }\r
         mutateActiveTabs((tabs) => {\r
             const tab = tabs[index];\r
             if (!tab) return;\r
@@ -314,15 +286,11 @@
             }\r
         });\r
         state.index = index;\r
-        afterLocalChange({ action: "activate", index });\r
+        emitToGame({ action: "activate", index });\r
+        render();\r
     }\r
 \r
     function activateAtIndex(index) {\r
-        if (isGameMode()) {\r
-            gameActivate(index);\r
-            return;\r
-        }\r
-\r
         const list = state.categories?.length\r
             ? state.categories[state.categoryIndex].tabs\r
             : state.elements;\r
@@ -343,11 +311,11 @@
                     state.elements = entry.subTabs;\r
                 }\r
                 state.index = 0;\r
-                const menuIdx = findSidebarMenuIndex(entry.label);\r
-                afterLocalChange({ action: "enter", index: menuIdx >= 0 ? menuIdx : index });\r
+                emitToGame({ action: "activate", index });\r
             } else {\r
-                emitToGame({ action: "enter", index });\r
+                emitToGame({ action: "activate", index });\r
             }\r
+            render();\r
             return;\r
         }\r
 \r
@@ -357,17 +325,19 @@
         }\r
 \r
         if (entry.type === "button") {\r
-            afterLocalChange({ action: "activate", index });\r
-            showNotification({\r
-                type: "success",\r
-                title: entry.label || "Action",\r
-                desc: "Triggered (dev preview)",\r
-                duration: 2000,\r
-            });\r
+            emitToGame({ action: "activate", index });\r
+            if (isLocalDevMode()) {\r
+                showNotification({\r
+                    type: "success",\r
+                    title: entry.label || "Action",\r
+                    desc: "Triggered (dev preview)",\r
+                    duration: 2000,\r
+                });\r
+            }\r
             return;\r
         }\r
 \r
-        afterLocalChange({ action: "activate", index });\r
+        emitToGame({ action: "activate", index });\r
     }\r
 \r
     function emitToGame(payload) {\r
@@ -408,10 +378,6 @@
     function afterLocalChange(gamePayload) {\r
         emitToGame(gamePayload);\r
         if (isLocalDevMode()) pushUpdate();\r
-    }\r
-\r
-    function gameActivate(index) {\r
-        emitToGame({ action: "activate", index });\r
     }\r
 \r
     function renderControl(entry) {\r
@@ -626,13 +592,19 @@
         if (data.elements) state.elements = data.elements;\r
         if (typeof data.index === "number") state.index = data.index;\r
         if (data.categories) state.categories = data.categories;\r
-        else if (data.action === "showUI" && !data.categories) state.categories = null;\r
+        else if (data.action === "showUI" && data.visible === false) state.categories = null;\r
         if (typeof data.categoryIndex === "number") state.categoryIndex = data.categoryIndex;\r
         if (data.path) state.path = data.path;\r
         if (data.sidebar) state.sidebar = data.sidebar;\r
         if (data.sidebarActive !== undefined) state.sidebarActive = data.sidebarActive;\r
         if (data.bannerColor) setMenuColor(data.bannerColor);\r
-        if (data.action === "showUI" && data.visible) {\r
+        if (state.sidebar.length && isRootMenuElements(state.elements) && !(state.categories && state.categories.length)) {\r
+            if (!state.sidebarActive) {\r
+                const first = state.sidebar.find((e) => e.type === "subMenu");\r
+                if (first) state.sidebarActive = first.label;\r
+            }\r
+            if (state.sidebarActive) loadSidebarSection(state.sidebarActive);\r
+        } else if (data.action === "showUI" && data.visible) {\r
             ensureSidebarContent();\r
         }\r
     }\r

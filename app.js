@@ -155,14 +155,13 @@
     }
 
     function openSidebarSection(label) {
-        if (isGameMode()) {
-            emitToGame({ action: "openSidebar", label });
+        if (!loadSidebarSection(label)) {
+            if (isGameMode()) emitToGame({ action: "openSidebar", label });
             return;
         }
-        if (!loadSidebarSection(label)) return;
-        const menuIdx = findSidebarMenuIndex(label);
         state.path = ["Onimaru", label];
-        emitToGame({ action: "openSidebar", label, index: menuIdx >= 0 ? menuIdx : 0 });
+        state.sidebarActive = label;
+        emitToGame({ action: "openSidebar", label });
         render();
     }
 
@@ -199,25 +198,18 @@
         const tabs = getActiveTabs();
         if (!tabs.length) return;
         if (tabs[index]?.type === "divider") return;
-        if (isGameMode()) {
-            emitToGame({ action: "select", index });
-            return;
-        }
         state.index = index;
         emitToGame({ action: "select", index });
-        processMessage({ action: "keydown", index: state.index });
+        render();
     }
 
     function switchCategory(index) {
         if (!state.categories || !state.categories.length) return;
-        if (isGameMode()) {
-            emitToGame({ action: "category", index });
-            return;
-        }
         state.categoryIndex = index;
         state.elements = state.categories[index].tabs || [];
         state.index = 0;
-        afterLocalChange({ action: "category", index });
+        emitToGame({ action: "category", index });
+        render();
     }
 
     function rowActivatesOnClick(entry) {
@@ -233,14 +225,6 @@
     }
 
     function adjustScrollable(index, dir) {
-        if (isGameMode()) {
-            emitToGame({
-                action: "scroll",
-                index,
-                dir: dir < 0 ? "left" : "right",
-            });
-            return;
-        }
         mutateActiveTabs((tabs) => {
             const tab = tabs[index];
             if (!tab || !tab.values?.length) return;
@@ -256,20 +240,11 @@
             index,
             dir: dir < 0 ? "left" : "right",
         });
+        render();
     }
 
     function adjustSlider(index, clientX, trackEl, opts) {
         const commit = !opts || opts.commit !== false;
-        if (isGameMode()) {
-            if (!commit) return;
-            const tab = getActiveTabs()[index];
-            const min = tab?.min ?? 0;
-            const max = tab?.max ?? 100;
-            const rect = trackEl.getBoundingClientRect();
-            const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-            emitToGame({ action: "slider", index, pct });
-            return;
-        }
         mutateActiveTabs((tabs) => {
             const tab = tabs[index];
             if (!tab) return;
@@ -293,13 +268,10 @@
             index,
             value: tab?.value,
         });
+        render();
     }
 
     function toggleAtIndex(index) {
-        if (isGameMode()) {
-            gameActivate(index);
-            return;
-        }
         mutateActiveTabs((tabs) => {
             const tab = tabs[index];
             if (!tab) return;
@@ -308,15 +280,11 @@
             }
         });
         state.index = index;
-        afterLocalChange({ action: "activate", index });
+        emitToGame({ action: "activate", index });
+        render();
     }
 
     function activateAtIndex(index) {
-        if (isGameMode()) {
-            gameActivate(index);
-            return;
-        }
-
         const list = state.categories?.length
             ? state.categories[state.categoryIndex].tabs
             : state.elements;
@@ -337,11 +305,11 @@
                     state.elements = entry.subTabs;
                 }
                 state.index = 0;
-                const menuIdx = findSidebarMenuIndex(entry.label);
-                afterLocalChange({ action: "enter", index: menuIdx >= 0 ? menuIdx : index });
+                emitToGame({ action: "activate", index });
             } else {
-                emitToGame({ action: "enter", index });
+                emitToGame({ action: "activate", index });
             }
+            render();
             return;
         }
 
@@ -351,17 +319,19 @@
         }
 
         if (entry.type === "button") {
-            afterLocalChange({ action: "activate", index });
-            showNotification({
-                type: "success",
-                title: entry.label || "Action",
-                desc: "Triggered (dev preview)",
-                duration: 2000,
-            });
+            emitToGame({ action: "activate", index });
+            if (isLocalDevMode()) {
+                showNotification({
+                    type: "success",
+                    title: entry.label || "Action",
+                    desc: "Triggered (dev preview)",
+                    duration: 2000,
+                });
+            }
             return;
         }
 
-        afterLocalChange({ action: "activate", index });
+        emitToGame({ action: "activate", index });
     }
 
     function emitToGame(payload) {
@@ -402,10 +372,6 @@
     function afterLocalChange(gamePayload) {
         emitToGame(gamePayload);
         if (isLocalDevMode()) pushUpdate();
-    }
-
-    function gameActivate(index) {
-        emitToGame({ action: "activate", index });
     }
 
     function renderControl(entry) {
@@ -620,13 +586,19 @@
         if (data.elements) state.elements = data.elements;
         if (typeof data.index === "number") state.index = data.index;
         if (data.categories) state.categories = data.categories;
-        else if (data.action === "showUI" && !data.categories) state.categories = null;
+        else if (data.action === "showUI" && data.visible === false) state.categories = null;
         if (typeof data.categoryIndex === "number") state.categoryIndex = data.categoryIndex;
         if (data.path) state.path = data.path;
         if (data.sidebar) state.sidebar = data.sidebar;
         if (data.sidebarActive !== undefined) state.sidebarActive = data.sidebarActive;
         if (data.bannerColor) setMenuColor(data.bannerColor);
-        if (data.action === "showUI" && data.visible) {
+        if (state.sidebar.length && isRootMenuElements(state.elements) && !(state.categories && state.categories.length)) {
+            if (!state.sidebarActive) {
+                const first = state.sidebar.find((e) => e.type === "subMenu");
+                if (first) state.sidebarActive = first.label;
+            }
+            if (state.sidebarActive) loadSidebarSection(state.sidebarActive);
+        } else if (data.action === "showUI" && data.visible) {
             ensureSidebarContent();
         }
     }
