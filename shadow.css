@@ -172,7 +172,8 @@ body.menu-open #game-cursor {
     transition: background 0.15s ease, color 0.15s ease;
 }
 
-.nav-item:hover {
+.nav-item:hover,
+.nav-item.hover {
     background: rgba(255, 255, 255, 0.04);
     color: var(--text);
 }
@@ -289,7 +290,8 @@ body.menu-open #game-cursor {
     white-space: nowrap;
 }
 
-.tab-item:hover {
+.tab-item:hover,
+.tab-item.hover {
     color: var(--text);
     background: rgba(255, 255, 255, 0.04);
 }

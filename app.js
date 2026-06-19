@@ -574,12 +574,54 @@
 
     let hoverRaf = 0;
     let lastHoverIdx = -1;
+    let hoveredNavEl = null;
+    let hoveredTabEl = null;
+
+    function findNavAt(x, y) {
+        if (!sidebarNav) return null;
+        const items = sidebarNav.querySelectorAll(".nav-item");
+        for (let i = items.length - 1; i >= 0; i--) {
+            if (rectContains(items[i], x, y)) return items[i];
+        }
+        return null;
+    }
+
+    function findTabAt(x, y) {
+        if (!tabNav) return null;
+        const items = tabNav.querySelectorAll(".tab-item");
+        for (let i = items.length - 1; i >= 0; i--) {
+            if (rectContains(items[i], x, y)) return items[i];
+        }
+        return null;
+    }
+
+    function applyChromeHover() {
+        if (sidebarNav) {
+            sidebarNav.querySelectorAll(".nav-item").forEach((node) => {
+                node.classList.toggle("hover", node === hoveredNavEl);
+            });
+        }
+        if (tabNav) {
+            tabNav.querySelectorAll(".tab-item").forEach((node) => {
+                node.classList.toggle("hover", node === hoveredTabEl);
+            });
+        }
+    }
 
     function updateHoverAt(x, y) {
         if (!menuIsInteractive()) return;
         if (hoverRaf) return;
         hoverRaf = requestAnimationFrame(() => {
             hoverRaf = 0;
+
+            const nextNav = findNavAt(x, y);
+            const nextTab = findTabAt(x, y);
+            if (nextNav !== hoveredNavEl || nextTab !== hoveredTabEl) {
+                hoveredNavEl = nextNav;
+                hoveredTabEl = nextTab;
+                applyChromeHover();
+            }
+
             const row = findFeatureRowAt(x, y);
             if (!row) return;
             const idx = parseInt(row.dataset.idx, 10);
@@ -596,36 +638,44 @@
         window.__ONIMARU_CLICK_RESOLVED__ = true;
     }
 
+    function resolveChromeClickAt(x, y) {
+        const nav = findNavAt(x, y);
+        if (nav && nav.dataset.sidebar) {
+            openSidebarSection(nav.dataset.sidebar);
+            return true;
+        }
+
+        const tab = findTabAt(x, y);
+        if (tab) {
+            if (tab.dataset.uiAction === "back") {
+                emitToGame({ action: "back" });
+            } else {
+                switchCategory(parseInt(tab.dataset.tabIndex, 10));
+            }
+            return true;
+        }
+
+        return false;
+    }
+
     function resolveMenuActionAt(x, y) {
         if (!menuIsInteractive()) return false;
 
         const now = Date.now();
         if (now - lastUiClickAt < 120) return false;
 
-        const hit = findMenuTargetAt(x, y);
-        if (hit && (hit.kind === "tab" || hit.kind === "nav" || hit.kind === "subcard")) {
+        if (resolveChromeClickAt(x, y)) {
             lastUiClickAt = now;
             markClickResolved();
-            const { kind, target } = hit;
+            return true;
+        }
 
-            if (kind === "tab") {
-                if (target.dataset.uiAction === "back") {
-                    emitToGame({ action: "back" });
-                } else {
-                    switchCategory(parseInt(target.dataset.tabIndex, 10));
-                }
-                return true;
-            }
-
-            if (kind === "nav" && target.dataset.sidebar) {
-                openSidebarSection(target.dataset.sidebar);
-                return true;
-            }
-
-            if (kind === "subcard") {
-                activateAtIndex(parseInt(target.dataset.idx, 10));
-                return true;
-            }
+        const hit = findMenuTargetAt(x, y);
+        if (hit && hit.kind === "subcard") {
+            lastUiClickAt = now;
+            markClickResolved();
+            activateAtIndex(parseInt(hit.target.dataset.idx, 10));
+            return true;
         }
 
         const row = findFeatureRowAt(x, y);
@@ -1027,6 +1077,7 @@
         renderTabs();
         renderContent();
         updateDesc();
+        applyChromeHover();
         requestAnimationFrame(() => {
             document.querySelector(".feature-row.active, .submenu-card.active")?.scrollIntoView({
                 block: "nearest",
