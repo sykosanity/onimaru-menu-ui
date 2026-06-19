@@ -1,5 +1,5 @@
 import { defineConfig, type Plugin } from "vite";
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs";
 import { resolve } from "path";
 import { viteSingleFile } from "vite-plugin-singlefile";
 
@@ -8,9 +8,16 @@ function reorderClassicHtmlForMacho(): Plugin {
   return {
     name: "onimaru-classic-macho-html",
     closeBundle() {
-      const built = resolve(process.cwd(), "dist/classic.html");
-      const pages = resolve(process.cwd(), "dist/index.html");
-      if (!existsSync(built)) return;
+      const distDir = resolve(process.cwd(), "dist");
+      const builtCandidates = [
+        resolve(distDir, "classic.html"),
+        resolve(distDir, "src/classic.html"),
+        resolve(distDir, "index.html"),
+      ];
+      const built = builtCandidates.find((p) => existsSync(p));
+      const pages = resolve(distDir, "index.html");
+      const classicOut = resolve(distDir, "classic.html");
+      if (!built) return;
 
       let html = readFileSync(built, "utf8");
 
@@ -43,8 +50,16 @@ ${bundleScript}
 </html>
 `;
 
-      writeFileSync(built, output);
+      writeFileSync(classicOut, output);
       writeFileSync(pages, output);
+      if (built !== classicOut && built !== pages) {
+        try {
+          const stale = resolve(distDir, "src/classic.html");
+          if (existsSync(stale)) unlinkSync(stale);
+        } catch {
+          /* ignore */
+        }
+      }
     },
   };
 }
@@ -55,14 +70,14 @@ export default defineConfig({
   base: "./",
   plugins: [viteSingleFile(), reorderClassicHtmlForMacho()],
   esbuild: {
-    target: "es5",
+    target: "es2015",
     supported: {
       "nullish-coalescing": false,
       "optional-chain": false,
     },
   },
   build: {
-    target: "es5",
+    target: "es2015",
     modulePreload: false,
     rollupOptions: {
       input: {
