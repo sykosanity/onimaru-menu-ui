@@ -385,8 +385,19 @@
         render();
     }
 
+    function uiOutboundExtras() {
+        const extra = {};
+        if (state.categories?.length) {
+            extra.categoryIndex = state.categoryIndex || 0;
+        }
+        if (state.sidebarActive) {
+            extra.section = state.sidebarActive;
+        }
+        return extra;
+    }
+
     function emitActivate(index, entry) {
-        const payload = { action: "activate", index };
+        const payload = { action: "activate", index, ...uiOutboundExtras() };
         if (entry?.label) payload.label = entry.label;
         emitToGame(payload);
     }
@@ -399,7 +410,7 @@
         if (t !== "checkbox" && t !== "slider-checkbox" && t !== "scrollable-checkbox") return;
 
         state.index = index;
-        emitToGame({ action: "activate", index, label: tab.label });
+        emitToGame({ action: "activate", index, label: tab.label, ...uiOutboundExtras() });
     }
 
     function activateAtIndex(index) {
@@ -456,7 +467,8 @@
         const msg = { source: "onimaru-ui", ...payload };
         const raw = JSON.stringify(msg);
         window.__ONIMARU_UI_OUTBOX__ = window.__ONIMARU_UI_OUTBOX__ || [];
-        window.__ONIMARU_UI_OUTBOX__.push(msg);
+        window.__ONIMARU_LAST_MSG__ = msg;
+        window.__ONIMARU_UI_OUTBOX__.push(raw);
 
         try {
             if (typeof window.machoPost === "function") {
@@ -1430,7 +1442,9 @@
     };
 
     window.__ONIMARU_CLICK_AT__ = function (nx, ny) {
+        window.__ONIMARU_LAST_MSG__ = null;
         handleInjectedMouse({ action: "mouse", type: "click", x: nx, y: ny });
+        return window.__ONIMARU_LAST_MSG__;
     };
 
     bindInteractions();

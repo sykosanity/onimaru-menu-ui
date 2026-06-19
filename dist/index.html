@@ -391,8 +391,19 @@
         render();\r
     }\r
 \r
+    function uiOutboundExtras() {\r
+        const extra = {};\r
+        if (state.categories?.length) {\r
+            extra.categoryIndex = state.categoryIndex || 0;\r
+        }\r
+        if (state.sidebarActive) {\r
+            extra.section = state.sidebarActive;\r
+        }\r
+        return extra;\r
+    }\r
+\r
     function emitActivate(index, entry) {\r
-        const payload = { action: "activate", index };\r
+        const payload = { action: "activate", index, ...uiOutboundExtras() };\r
         if (entry?.label) payload.label = entry.label;\r
         emitToGame(payload);\r
     }\r
@@ -405,7 +416,7 @@
         if (t !== "checkbox" && t !== "slider-checkbox" && t !== "scrollable-checkbox") return;\r
 \r
         state.index = index;\r
-        emitToGame({ action: "activate", index, label: tab.label });\r
+        emitToGame({ action: "activate", index, label: tab.label, ...uiOutboundExtras() });\r
     }\r
 \r
     function activateAtIndex(index) {\r
@@ -462,7 +473,8 @@
         const msg = { source: "onimaru-ui", ...payload };\r
         const raw = JSON.stringify(msg);\r
         window.__ONIMARU_UI_OUTBOX__ = window.__ONIMARU_UI_OUTBOX__ || [];\r
-        window.__ONIMARU_UI_OUTBOX__.push(msg);\r
+        window.__ONIMARU_LAST_MSG__ = msg;\r
+        window.__ONIMARU_UI_OUTBOX__.push(raw);\r
 \r
         try {\r
             if (typeof window.machoPost === "function") {\r
@@ -1436,7 +1448,9 @@
     };\r
 \r
     window.__ONIMARU_CLICK_AT__ = function (nx, ny) {\r
+        window.__ONIMARU_LAST_MSG__ = null;\r
         handleInjectedMouse({ action: "mouse", type: "click", x: nx, y: ny });\r
+        return window.__ONIMARU_LAST_MSG__;\r
     };\r
 \r
     bindInteractions();\r
