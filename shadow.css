@@ -565,7 +565,7 @@ body.menu-open #game-cursor {
 .feature-row:hover .row-menu-btn,
 .feature-row.active .row-menu-btn {
     opacity: 1;
-    pointer-events: auto;
+    pointer-events: none;
 }
 
 /* ── Controls ── */

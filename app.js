@@ -233,16 +233,19 @@
         if (!entry || entry.type === "divider") return;
 
         state.index = idx;
-        const t = clickTarget || null;
 
         if (entry.type === "slider-checkbox") {
-            if (t && t.closest(".toggle")) {
+            if (clickTarget && clickTarget.closest(".toggle")) {
                 toggleAtIndex(idx);
                 return;
             }
             const track = row.querySelector(".slider-track");
-            if (track && t && (t.closest(".slider-wrap") || t.closest(".slider-track") || t.closest(".slider-num"))) {
+            if (track && clickTarget && (clickTarget.closest(".slider-wrap") || clickTarget.closest(".slider-track") || clickTarget.closest(".slider-num"))) {
                 adjustSlider(idx, x, track);
+                return;
+            }
+            if (clickTarget && clickTarget.closest(".btn-pill")) {
+                activateAtIndex(idx);
                 return;
             }
             toggleAtIndex(idx);
@@ -250,9 +253,9 @@
         }
 
         if (entry.type === "slider") {
-            const onTrack = t && (t.closest(".slider-track") || t.closest(".slider-num"));
-            const onRun = t && t.closest(".btn-pill");
-            if (onRun || (entry.scrollType === "onEnter" && !onTrack)) {
+            const onTrack = clickTarget && (clickTarget.closest(".slider-track") || clickTarget.closest(".slider-num"));
+            const onRun = clickTarget && clickTarget.closest(".btn-pill");
+            if (onRun) {
                 activateAtIndex(idx);
                 return;
             }
@@ -261,7 +264,7 @@
                 adjustSlider(idx, x, track);
                 return;
             }
-            if (track) {
+            if (track && entry.scrollType !== "onEnter") {
                 adjustSlider(idx, x, track);
                 return;
             }
@@ -648,6 +651,79 @@
         });
     }
 
+    function resolveInteractiveTarget(row, x, y) {
+        const selectors = [".btn-pill", ".toggle", ".slider-track", ".slider-num", ".scroll-ctrl", ".scroll-value"];
+        if (typeof document.elementsFromPoint === "function") {
+            for (const el of document.elementsFromPoint(x, y)) {
+                if (!(el instanceof HTMLElement)) continue;
+                if (el.id === "game-cursor") continue;
+                for (let i = 0; i < selectors.length; i++) {
+                    const hit = el.closest(selectors[i]);
+                    if (hit && row.contains(hit)) return hit;
+                }
+            }
+        }
+        for (let i = 0; i < selectors.length; i++) {
+            const nodes = row.querySelectorAll(selectors[i]);
+            for (let j = nodes.length - 1; j >= 0; j--) {
+                if (rectContains(nodes[j], x, y)) return nodes[j];
+            }
+        }
+        return null;
+    }
+
+    function resolveControlHitAt(x, y) {
+        const hit = findMenuTargetAt(x, y);
+        if (!hit) return false;
+
+        const { kind, target } = hit;
+
+        if (kind === "toggle") {
+            const toggleRow = target.closest(".feature-row");
+            if (toggleRow) toggleAtIndex(parseInt(toggleRow.dataset.idx, 10));
+            return true;
+        }
+
+        if (kind === "pill") {
+            const pillRow = target.closest(".feature-row");
+            if (pillRow) activateAtIndex(parseInt(pillRow.dataset.idx, 10));
+            return true;
+        }
+
+        if (kind === "scroll") {
+            const scrollRow = target.closest(".feature-row");
+            if (!scrollRow) return false;
+            adjustScrollable(
+                parseInt(scrollRow.dataset.idx, 10),
+                target.dataset.dir === "left" ? -1 : 1
+            );
+            return true;
+        }
+
+        if (kind === "scroll-value") {
+            const scrollRow = target.closest(".feature-row");
+            if (scrollRow) activateAtIndex(parseInt(scrollRow.dataset.idx, 10));
+            return true;
+        }
+
+        if (kind === "slider") {
+            const sliderRow = target.closest(".feature-row");
+            if (!sliderRow) return false;
+            adjustSlider(parseInt(sliderRow.dataset.idx, 10), x, target);
+            return true;
+        }
+
+        if (kind === "slider-num") {
+            const numRow = target.closest(".feature-row");
+            if (!numRow) return false;
+            const track = numRow.querySelector(".slider-track");
+            if (track) adjustSlider(parseInt(numRow.dataset.idx, 10), x, track);
+            return true;
+        }
+
+        return false;
+    }
+
     function markClickResolved() {
         window.__ONIMARU_CLICK_RESOLVED__ = true;
     }
@@ -684,6 +760,12 @@
             return true;
         }
 
+        if (resolveControlHitAt(x, y)) {
+            lastUiClickAt = now;
+            markClickResolved();
+            return true;
+        }
+
         const hit = findMenuTargetAt(x, y);
         if (hit && hit.kind === "subcard") {
             lastUiClickAt = now;
@@ -697,74 +779,17 @@
             lastUiClickAt = now;
             markClickResolved();
             const idx = parseInt(row.dataset.idx, 10);
-            let clickTarget = row;
-            if (typeof document.elementsFromPoint === "function") {
-                for (const el of document.elementsFromPoint(x, y)) {
-                    if (!(el instanceof HTMLElement)) continue;
-                    if (el.id === "game-cursor") continue;
-                    if (el instanceof HTMLElement && row.contains(el)) {
-                        clickTarget = el;
-                        break;
-                    }
-                }
-            }
+            const clickTarget = resolveInteractiveTarget(row, x, y);
             handleFeatureRowClick(idx, x, y, row, clickTarget);
             return true;
         }
 
         if (!hit) return false;
 
-        lastUiClickAt = now;
-        markClickResolved();
-        const { kind, target } = hit;
-
-        if (kind === "toggle") {
-            const toggleRow = target.closest(".feature-row");
-            if (toggleRow) toggleAtIndex(parseInt(toggleRow.dataset.idx, 10));
-            return true;
-        }
-
-        if (kind === "scroll") {
-            const scrollRow = target.closest(".feature-row");
-            if (!scrollRow) return false;
-            adjustScrollable(
-                parseInt(scrollRow.dataset.idx, 10),
-                target.dataset.dir === "left" ? -1 : 1
-            );
-            return true;
-        }
-
-        if (kind === "scroll-value") {
-            const scrollRow = target.closest(".feature-row");
-            if (scrollRow) activateAtIndex(parseInt(scrollRow.dataset.idx, 10));
-            return true;
-        }
-
-        if (kind === "slider") {
-            const sliderRow = target.closest(".feature-row");
-            if (!sliderRow) return false;
-            adjustSlider(parseInt(sliderRow.dataset.idx, 10), x, target);
-            return true;
-        }
-
-        if (kind === "slider-num") {
-            const numRow = target.closest(".feature-row");
-            if (!numRow) return false;
-            const track = numRow.querySelector(".slider-track");
-            if (track) {
-                adjustSlider(parseInt(numRow.dataset.idx, 10), x, track);
-            }
-            return true;
-        }
-
-        if (kind === "pill") {
-            const pillRow = target.closest(".feature-row");
-            if (pillRow) activateAtIndex(parseInt(pillRow.dataset.idx, 10));
-            return true;
-        }
-
-        if (kind === "row") {
-            handleFeatureRowClick(parseInt(target.dataset.idx, 10), x, y, target, target);
+        if (hit.kind === "row") {
+            lastUiClickAt = now;
+            markClickResolved();
+            handleFeatureRowClick(parseInt(hit.target.dataset.idx, 10), x, y, hit.target, hit.target);
             return true;
         }
 
@@ -879,6 +904,7 @@
                 adjustSlider(sliderDrag.idx, x, sliderDrag.track);
                 sliderDrag = null;
                 skipNextClickResolve = true;
+                window.__ONIMARU_FLUSH_OUTBOUND__ = true;
             }
             firePointer(window, "pointerup", x, y);
             if (el) {
