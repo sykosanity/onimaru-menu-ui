@@ -337,12 +337,12 @@
     function emitToGame(payload) {
         const msg = { source: "onimaru-ui", ...payload };
         const raw = JSON.stringify(msg);
-        let sent = false;
+        window.__ONIMARU_UI_OUTBOX__ = window.__ONIMARU_UI_OUTBOX__ || [];
+        window.__ONIMARU_UI_OUTBOX__.push(msg);
 
         try {
             if (typeof window.machoPost === "function") {
                 window.machoPost(raw);
-                sent = true;
             }
         } catch {
             /* ignore */
@@ -353,7 +353,14 @@
                 window.invokeNative("onimaruUi", raw);
                 window.invokeNative("duiCallback", raw);
                 window.invokeNative("sendDuiMessage", raw);
-                sent = true;
+            }
+        } catch {
+            /* ignore */
+        }
+
+        try {
+            if (window.cfx && typeof window.cfx.postMessage === "function") {
+                window.cfx.postMessage(raw);
             }
         } catch {
             /* ignore */
@@ -361,12 +368,250 @@
 
         try {
             window.parent.postMessage(raw, "*");
-            sent = true;
         } catch {
             /* ignore */
         }
 
-        return sent;
+        return true;
+    }
+
+    function viewportSize() {
+        return {
+            width: document.documentElement.clientWidth || window.innerWidth || 1,
+            height: document.documentElement.clientHeight || window.innerHeight || 1,
+        };
+    }
+
+    function pointerFromNorm(nx, ny) {
+        const { width, height } = viewportSize();
+        return {
+            x: Math.max(0, Math.min(width - 1, nx * width)),
+            y: Math.max(0, Math.min(height - 1, ny * height)),
+        };
+    }
+
+    function elementAtPoint(x, y) {
+        const ignore = new Set(["game-cursor"]);
+        const ignoreSel = [".keyboard-backdrop", ".notifications", "#page-error"];
+        const stack =
+            typeof document.elementsFromPoint === "function"
+                ? document.elementsFromPoint(x, y)
+                : [document.elementFromPoint(x, y)].filter(Boolean);
+        for (const el of stack) {
+            if (!(el instanceof HTMLElement)) continue;
+            if (ignore.has(el.id)) continue;
+            let skip = false;
+            for (const sel of ignoreSel) {
+                if (el.matches(sel) || el.closest(sel)) {
+                    skip = true;
+                    break;
+                }
+            }
+            if (!skip) return el;
+        }
+        return null;
+    }
+
+    let pointerPressed = false;
+    let lastUiClickAt = 0;
+
+    function menuIsInteractive() {
+        return state.visible || dashboard.classList.contains("visible");
+    }
+
+    function resolveMenuActionAt(x, y) {
+        if (!menuIsInteractive()) return false;
+
+        const now = Date.now();
+        if (now - lastUiClickAt < 120) return false;
+
+        const hit = elementAtPoint(x, y);
+        if (!hit || !dashboard.contains(hit)) return false;
+
+        const toggle = hit.closest(".toggle");
+        if (toggle) {
+            const row = toggle.closest(".feature-row");
+            if (row) {
+                lastUiClickAt = now;
+                toggleAtIndex(parseInt(row.dataset.idx, 10));
+                return true;
+            }
+        }
+
+        const scrollCtrl = hit.closest(".scroll-ctrl");
+        if (scrollCtrl) {
+            const row = scrollCtrl.closest(".feature-row");
+            if (row) {
+                lastUiClickAt = now;
+                adjustScrollable(
+                    parseInt(row.dataset.idx, 10),
+                    scrollCtrl.dataset.dir === "left" ? -1 : 1
+                );
+                return true;
+            }
+        }
+
+        const track = hit.closest(".slider-track");
+        if (track) {
+            const row = track.closest(".feature-row");
+            if (row) {
+                lastUiClickAt = now;
+                adjustSlider(parseInt(row.dataset.idx, 10), x, track);
+                return true;
+            }
+        }
+
+        const btnPill = hit.closest(".btn-pill");
+        if (btnPill) {
+            const row = btnPill.closest(".feature-row");
+            if (row) {
+                lastUiClickAt = now;
+                activateAtIndex(parseInt(row.dataset.idx, 10));
+                return true;
+            }
+        }
+
+        const tab = hit.closest(".tab-item");
+        if (tab) {
+            lastUiClickAt = now;
+            if (tab.dataset.uiAction === "back") {
+                emitToGame({ action: "back" });
+            } else {
+                switchCategory(parseInt(tab.dataset.tabIndex, 10));
+            }
+            return true;
+        }
+
+        const nav = hit.closest(".nav-item");
+        if (nav?.dataset.sidebar) {
+            lastUiClickAt = now;
+            openSidebarSection(nav.dataset.sidebar);
+            return true;
+        }
+
+        const subCard = hit.closest(".submenu-card");
+        if (subCard) {
+            lastUiClickAt = now;
+            activateAtIndex(parseInt(subCard.dataset.idx, 10));
+            return true;
+        }
+
+        const row = hit.closest(".feature-row");
+        if (row) {
+            lastUiClickAt = now;
+            const idx = parseInt(row.dataset.idx, 10);
+            const entry = getActiveTabs()[idx];
+            if (rowActivatesOnClick(entry)) {
+                activateAtIndex(idx);
+            } else {
+                selectIndex(idx);
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    function fireMouse(target, type, x, y) {
+        target.dispatchEvent(
+            new MouseEvent(type, {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                button: 0,
+                clientX: x,
+                clientY: y,
+            })
+        );
+    }
+
+    function firePointer(target, type, x, y) {
+        const Ctor = window.PointerEvent;
+        if (Ctor) {
+            target.dispatchEvent(
+                new Ctor(type, {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    button: 0,
+                    clientX: x,
+                    clientY: y,
+                    pointerId: 1,
+                    pointerType: "mouse",
+                    isPrimary: true,
+                })
+            );
+        } else {
+            fireMouse(target, type === "pointerdown" ? "mousedown" : type === "pointerup" ? "mouseup" : "mousemove", x, y);
+        }
+    }
+
+    function scrollAtPoint(x, y, delta) {
+        const hit = elementAtPoint(x, y);
+        let node = hit;
+        while (node && node instanceof HTMLElement) {
+            const style = window.getComputedStyle(node);
+            const oy = style.overflowY;
+            if ((oy === "auto" || oy === "scroll") && node.scrollHeight > node.clientHeight + 1) {
+                const step = Math.max(32, Math.min(120, node.clientHeight * 0.15));
+                node.scrollTop += delta > 0 ? step : -step;
+                return;
+            }
+            node = node.parentElement;
+        }
+    }
+
+    function handleInjectedMouse(data) {
+        if (typeof data.x !== "number" || typeof data.y !== "number") return;
+        const { x, y } = pointerFromNorm(data.x, data.y);
+
+        let gc = document.getElementById("game-cursor");
+        if (!gc && !isLocalDevMode()) {
+            gc = document.createElement("div");
+            gc.id = "game-cursor";
+            gc.className = "game-cursor";
+            gc.setAttribute("aria-hidden", "true");
+            document.body.appendChild(gc);
+        }
+        if (gc) {
+            gc.style.left = x + "px";
+            gc.style.top = y + "px";
+        }
+
+        if (!menuIsInteractive()) return;
+
+        if (data.type === "move") {
+            if (pointerPressed) firePointer(window, "pointermove", x, y);
+            return;
+        }
+
+        if (data.type === "wheel") {
+            const delta = typeof data.delta === "number" ? data.delta : 0;
+            if (delta !== 0) scrollAtPoint(x, y, delta);
+            return;
+        }
+
+        if (data.type === "down") {
+            const el = elementAtPoint(x, y);
+            if (el) {
+                pointerPressed = true;
+                firePointer(el, "pointerdown", x, y);
+                fireMouse(el, "mousedown", x, y);
+            }
+            return;
+        }
+
+        if (data.type === "up" || data.type === "click") {
+            const el = elementAtPoint(x, y);
+            firePointer(window, "pointerup", x, y);
+            if (el) {
+                fireMouse(el, "mouseup", x, y);
+            }
+            if (!resolveMenuActionAt(x, y) && el) {
+                fireMouse(el, "click", x, y);
+            }
+            pointerPressed = false;
+        }
     }
 
     function afterLocalChange(gamePayload) {
@@ -651,35 +896,22 @@
     }
 
     function synthesizeMenuClick(px, py) {
-        const selectors =
-            ".nav-item, .tab-item, .submenu-card, .feature-row, .toggle, .scroll-ctrl, .slider-track, .btn-pill";
-        const stack = document.elementsFromPoint(px, py) || [];
-        for (const el of stack) {
-            const target = el.closest?.(selectors);
-            if (target && dashboard.contains(target)) {
-                target.click();
-                return true;
-            }
-        }
-        return false;
+        handleInjectedMouse({ action: "mouse", type: "click", x: px / viewportSize().width, y: py / viewportSize().height });
     }
 
     function bindInteractions() {
         if (dashboard.dataset.bound === "1") return;
         dashboard.dataset.bound = "1";
 
-        let lastClickAt = 0;
-
         dashboard.addEventListener("click", (e) => {
-            if (!state.visible) return;
+            if (!menuIsInteractive()) return;
 
             const now = Date.now();
-            if (now - lastClickAt < 280) {
+            if (now - lastUiClickAt < 120) {
                 e.preventDefault();
                 e.stopPropagation();
                 return;
             }
-            lastClickAt = now;
 
             const toggle = e.target.closest(".toggle");
             if (toggle) {
@@ -742,6 +974,7 @@
             if (row) {
                 const idx = parseInt(row.dataset.idx, 10);
                 const entry = getActiveTabs()[idx];
+                lastUiClickAt = now;
                 if (rowActivatesOnClick(entry)) {
                     activateAtIndex(idx);
                 } else {
@@ -754,7 +987,7 @@
         let sliderDrag = null;
 
         dashboard.addEventListener("pointerdown", (e) => {
-            if (!state.visible) return;
+            if (!menuIsInteractive()) return;
             const track = e.target.closest(".slider-track");
             if (!track) return;
             const row = track.closest(".feature-row");
@@ -908,27 +1141,9 @@
             case "setCursor":
                 document.body.classList.toggle("game-cursor", !!data.visible);
                 break;
-            case "mouse": {
-                if (typeof data.x !== "number" || typeof data.y !== "number") break;
-                const px = data.x * window.innerWidth;
-                const py = data.y * window.innerHeight;
-                let gc = document.getElementById("game-cursor");
-                if (!gc && !isLocalDevMode()) {
-                    gc = document.createElement("div");
-                    gc.id = "game-cursor";
-                    gc.className = "game-cursor";
-                    gc.setAttribute("aria-hidden", "true");
-                    document.body.appendChild(gc);
-                }
-                if (gc) {
-                    gc.style.left = px + "px";
-                    gc.style.top = py + "px";
-                }
-                if (data.type === "up" || data.type === "click") {
-                    synthesizeMenuClick(px, py);
-                }
+            case "mouse":
+                handleInjectedMouse(data);
                 break;
-            }
             case "updateBanner":
                 if (data.bannerColor) setMenuColor(data.bannerColor);
                 break;
