@@ -22,9 +22,9 @@ function reorderClassicHtmlForMacho(): Plugin {
       const headInner = headMatch?.[1] ?? "";
       let bundleScript =
         headInner.match(/<script[^>]*>[\s\S]*?<\/script>/i)?.[0] ?? "";
-      bundleScript = bundleScript
-        .replace(/\s*type="module"/gi, "")
-        .replace(/\s*crossorigin/gi, "");
+      // Only normalize the opening <script> tag — never strip "crossorigin" inside JS
+      // (Vite's modulepreload polyfill uses n.crossOrigin; global replace breaks it).
+      bundleScript = bundleScript.replace(/^<script[^>]*>/i, "<script>");
 
       const cleanBody = bodyInner.replace(bundleScript, "").trim();
 
@@ -56,6 +56,7 @@ export default defineConfig({
   plugins: [viteSingleFile(), reorderClassicHtmlForMacho()],
   build: {
     target: "es2018",
+    modulePreload: false,
     rollupOptions: {
       input: {
         index: resolve(__dirname, "classic.html"),

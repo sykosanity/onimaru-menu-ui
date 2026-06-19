@@ -62,7 +62,7 @@
         },
       };
     </script>
-<script>(function(){const r=document.createElement("link").relList;if(r&&r.supports&&r.supports("modulepreload"))return;for(const n of document.querySelectorAll('link[rel="modulepreload"]'))i(n);new MutationObserver(n=>{for(const e of n)if(e.type==="childList")for(const a of e.addedNodes)a.tagName==="LINK"&&a.rel==="modulepreload"&&i(a)}).observe(document,{childList:!0,subtree:!0});function o(n){const e={};return n.integrity&&(e.integrity=n.integrity),n.referrerPolicy&&(e.referrerPolicy=n.referrerPolicy),n.==="use-credentials"?e.credentials="include":n.==="anonymous"?e.credentials="omit":e.credentials="same-origin",e}function i(n){if(n.ep)return;n.ep=!0;const e=o(n);fetch(n.href,e)}})();const l=`(function () {\r
+<script>const t=`(function () {\r
     function boot() {\r
     const ICONS = {\r
         self: "◎",\r
@@ -1577,6 +1577,6 @@
         boot();\r
     }\r
 })();\r
-`;function s(){const t=document.body||document.documentElement;if(!t||!document.getElementById("dashboard"))return;const r=document.createElement("script");r.textContent=l,t.appendChild(r)}function c(){if(document.getElementById("dashboard")){s();return}document.readyState==="loading"&&document.addEventListener("DOMContentLoaded",s,{once:!0})}c();</script>
+`;function r(){const n=document.body||document.documentElement;if(!n||!document.getElementById("dashboard"))return;const e=document.createElement("script");e.textContent=t,n.appendChild(e)}function a(){if(document.getElementById("dashboard")){r();return}document.readyState==="loading"&&document.addEventListener("DOMContentLoaded",r,{once:!0})}a();</script>
 </body>
 </html>
