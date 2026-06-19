@@ -271,6 +271,11 @@
         selectIndex(idx);
     }
 
+    function rectContains(el, x, y) {
+        const r = el.getBoundingClientRect();
+        return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+    }
+
     function findMenuTargetAt(x, y) {
         const stack =
             typeof document.elementsFromPoint === "function"
@@ -297,6 +302,24 @@
                 const target = el.closest(selector);
                 if (target && dashboard.contains(target)) {
                     return { kind, target };
+                }
+            }
+        }
+
+        // CEF/Macho DUI often fails elementsFromPoint for injected clicks — fall back to bounds.
+        const rectPairs = [
+            [".toggle", "toggle"],
+            [".btn-pill", "pill"],
+            [".slider-track", "slider"],
+            [".scroll-ctrl", "scroll"],
+            [".feature-row", "row"],
+        ];
+        for (const [selector, kind] of rectPairs) {
+            const nodes = dashboard.querySelectorAll(selector);
+            for (let i = nodes.length - 1; i >= 0; i--) {
+                const node = nodes[i];
+                if (rectContains(node, x, y)) {
+                    return { kind, target: node };
                 }
             }
         }
@@ -518,7 +541,7 @@
         if (!menuIsInteractive()) return false;
 
         const now = Date.now();
-        if (now - lastUiClickAt < 200) return false;
+        if (now - lastUiClickAt < 120) return false;
 
         const hit = findMenuTargetAt(x, y);
         if (!hit) return false;
@@ -687,7 +710,17 @@
             return;
         }
 
-        if (data.type === "up" || data.type === "click") {
+        if (data.type === "up") {
+            const el = elementAtPoint(x, y);
+            firePointer(window, "pointerup", x, y);
+            if (el) {
+                fireMouse(el, "mouseup", x, y);
+            }
+            pointerPressed = false;
+            return;
+        }
+
+        if (data.type === "click") {
             const el = elementAtPoint(x, y);
             firePointer(window, "pointerup", x, y);
             if (el) {
@@ -1005,7 +1038,7 @@
             if (!menuIsInteractive()) return;
 
             const now = Date.now();
-            if (now - lastUiClickAt < 200) {
+            if (now - lastUiClickAt < 120) {
                 e.preventDefault();
                 e.stopPropagation();
                 return;

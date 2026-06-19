@@ -526,6 +526,16 @@ body.menu-open #game-cursor {
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
+    position: relative;
+    z-index: 2;
+}
+
+.feature-actions .toggle,
+.feature-actions .btn-pill,
+.feature-actions .scroll-ctrl {
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
 }
 
 .feature-actions .slider-wrap {
@@ -546,12 +556,14 @@ body.menu-open #game-cursor {
     align-items: center;
     justify-content: center;
     opacity: 0;
+    pointer-events: none;
     transition: opacity 0.15s ease;
 }
 
 .feature-row:hover .row-menu-btn,
 .feature-row.active .row-menu-btn {
     opacity: 1;
+    pointer-events: auto;
 }
 
 /* ── Controls ── */
