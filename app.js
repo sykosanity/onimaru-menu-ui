@@ -250,7 +250,17 @@
         }
 
         if (entry.type === "slider") {
+            const onTrack = t && (t.closest(".slider-track") || t.closest(".slider-num"));
+            const onRun = t && t.closest(".btn-pill");
+            if (onRun || (entry.scrollType === "onEnter" && !onTrack)) {
+                activateAtIndex(idx);
+                return;
+            }
             const track = row.querySelector(".slider-track");
+            if (track && onTrack) {
+                adjustSlider(idx, x, track);
+                return;
+            }
             if (track) {
                 adjustSlider(idx, x, track);
                 return;
@@ -345,6 +355,7 @@
         afterLocalChange({
             action: "scroll",
             index,
+            label: getActiveTabs()[index]?.label,
             dir: dir < 0 ? "left" : "right",
         });
         render();
@@ -373,6 +384,7 @@
         afterLocalChange({
             action: "slider",
             index,
+            label: tab?.label,
             value: tab?.value,
             pct:
                 trackEl && trackEl.getBoundingClientRect
@@ -548,6 +560,8 @@
 
     let pointerPressed = false;
     let lastUiClickAt = 0;
+    let sliderDrag = null;
+    let skipNextClickResolve = false;
 
     function menuIsInteractive() {
         return state.visible || dashboard.classList.contains("visible");
@@ -827,7 +841,11 @@
 
         if (data.type === "move") {
             updateHoverAt(x, y);
-            if (pointerPressed) firePointer(window, "pointermove", x, y);
+            if (sliderDrag) {
+                adjustSlider(sliderDrag.idx, x, sliderDrag.track, { commit: false });
+            } else if (pointerPressed) {
+                firePointer(window, "pointermove", x, y);
+            }
             return;
         }
 
@@ -841,6 +859,14 @@
             const el = elementAtPoint(x, y);
             if (el) {
                 pointerPressed = true;
+                const track = el.closest(".slider-track");
+                if (track) {
+                    const row = track.closest(".feature-row");
+                    if (row) {
+                        sliderDrag = { track, idx: parseInt(row.dataset.idx, 10) };
+                        adjustSlider(sliderDrag.idx, x, track, { commit: false });
+                    }
+                }
                 firePointer(el, "pointerdown", x, y);
                 fireMouse(el, "mousedown", x, y);
             }
@@ -849,6 +875,11 @@
 
         if (data.type === "up") {
             const el = elementAtPoint(x, y);
+            if (sliderDrag) {
+                adjustSlider(sliderDrag.idx, x, sliderDrag.track);
+                sliderDrag = null;
+                skipNextClickResolve = true;
+            }
             firePointer(window, "pointerup", x, y);
             if (el) {
                 fireMouse(el, "mouseup", x, y);
@@ -858,6 +889,11 @@
         }
 
         if (data.type === "click") {
+            if (skipNextClickResolve) {
+                skipNextClickResolve = false;
+                pointerPressed = false;
+                return;
+            }
             const el = elementAtPoint(x, y);
             firePointer(window, "pointerup", x, y);
             if (el) {
@@ -904,12 +940,20 @@
             return `${extra}<button type="button" class="toggle ${on ? "on" : ""}" aria-pressed="${on}"></button>`;
         }
         if (type === "slider") {
-            return renderSliderWrap(entry);
+            const runBtn =
+                entry.scrollType === "onEnter"
+                    ? `<button type="button" class="btn-pill">Run</button>`
+                    : "";
+            return `${renderSliderWrap(entry)}${runBtn}`;
         }
         if (type === "scrollable") {
+            const runBtn =
+                entry.scrollType === "onEnter"
+                    ? `<button type="button" class="btn-pill">Run</button>`
+                    : "";
             return `<button type="button" class="scroll-ctrl" data-dir="left" title="Previous">‹</button>
                 <span class="scroll-value">${escapeHtml(scrollableLabel(entry))}</span>
-                <button type="button" class="scroll-ctrl" data-dir="right" title="Next">›</button>`;
+                <button type="button" class="scroll-ctrl" data-dir="right" title="Next">›</button>${runBtn}`;
         }
         if (type === "subMenu") {
             return `<span class="sub-arrow">›</span>`;
@@ -1265,8 +1309,6 @@
                 return;
             }
         });
-
-        let sliderDrag = null;
 
         dashboard.addEventListener("pointerdown", (e) => {
             if (!menuIsInteractive()) return;
