@@ -1137,34 +1137,31 @@
     }\r
 \r
     function isKeybindPromptOpen() {\r
-        if (isLocalDevMode()) return false;\r
-        return !!(inputWrap && inputWrap.classList.contains("visible"));\r
+        if (document.getElementById("boot-keybind-fallback")) return true;\r
+        return !!(inputWrap && inputWrap.classList.contains("visible")) || document.body.classList.contains("keyboard-prompt");\r
     }\r
 \r
     function postKeybindPick(label, code) {\r
         emitToGame({ action: "keybindPick", key: label, code: code });\r
         if (inputValue) inputValue.textContent = label;\r
+        const boot = document.getElementById("boot-key-value");\r
+        if (boot) boot.textContent = label;\r
     }\r
 \r
-    // In Macho/FiveM, keys are captured by MachoOnKeyDown in Lua — not CEF keydown.\r
-    // CEF often emits a spurious Backspace when the modal updates, which overwrote\r
-    // the real key the user pressed. Only use this path for local browser preview.\r
-    if (isLocalDevMode()) {\r
-        window.addEventListener(\r
-            "keydown",\r
-            (e) => {\r
-                if (!isKeybindPromptOpen()) return;\r
-                if (e.repeat) return;\r
-                const k = e.key;\r
-                if (!k || isModifierKey(k) || isIgnoredKeybindKey(k)) return;\r
-                e.preventDefault();\r
-                e.stopPropagation();\r
-                const label = k === "Shift" ? "Shift" : k.length === 1 ? k.toUpperCase() : k;\r
-                postKeybindPick(label, e.keyCode || e.which || 0);\r
-            },\r
-            true\r
-        );\r
-    }\r
+    window.addEventListener(\r
+        "keydown",\r
+        (e) => {\r
+            if (!isKeybindPromptOpen()) return;\r
+            if (e.repeat) return;\r
+            const k = e.key;\r
+            if (!k || isModifierKey(k) || isIgnoredKeybindKey(k)) return;\r
+            e.preventDefault();\r
+            e.stopPropagation();\r
+            const label = k === "Shift" ? "Shift" : k.length === 1 ? k.toUpperCase() : k;\r
+            postKeybindPick(label, e.keyCode || e.which || 0);\r
+        },\r
+        true\r
+    );\r
 \r
     function isLocalDevMode() {\r
         const params = new URLSearchParams(window.location.search);\r
