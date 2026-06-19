@@ -244,27 +244,13 @@
                 adjustSlider(idx, x, track);
                 return;
             }
-            if (clickTarget && clickTarget.closest(".btn-pill")) {
-                activateAtIndex(idx);
-                return;
-            }
             toggleAtIndex(idx);
             return;
         }
 
         if (entry.type === "slider") {
-            const onTrack = clickTarget && (clickTarget.closest(".slider-track") || clickTarget.closest(".slider-num"));
-            const onRun = clickTarget && clickTarget.closest(".btn-pill");
-            if (onRun) {
-                activateAtIndex(idx);
-                return;
-            }
             const track = row.querySelector(".slider-track");
-            if (track && onTrack) {
-                adjustSlider(idx, x, track);
-                return;
-            }
-            if (track && entry.scrollType !== "onEnter") {
+            if (track) {
                 adjustSlider(idx, x, track);
                 return;
             }
@@ -358,7 +344,6 @@
         afterLocalChange({
             action: "scroll",
             index,
-            label: getActiveTabs()[index]?.label,
             dir: dir < 0 ? "left" : "right",
         });
         render();
@@ -387,7 +372,6 @@
         afterLocalChange({
             action: "slider",
             index,
-            label: tab?.label,
             value: tab?.value,
             pct:
                 trackEl && trackEl.getBoundingClientRect
@@ -563,8 +547,6 @@
 
     let pointerPressed = false;
     let lastUiClickAt = 0;
-    let sliderDrag = null;
-    let skipNextClickResolve = false;
 
     function menuIsInteractive() {
         return state.visible || dashboard.classList.contains("visible");
@@ -651,79 +633,6 @@
         });
     }
 
-    function resolveInteractiveTarget(row, x, y) {
-        const selectors = [".btn-pill", ".toggle", ".slider-track", ".slider-num", ".scroll-ctrl", ".scroll-value"];
-        if (typeof document.elementsFromPoint === "function") {
-            for (const el of document.elementsFromPoint(x, y)) {
-                if (!(el instanceof HTMLElement)) continue;
-                if (el.id === "game-cursor") continue;
-                for (let i = 0; i < selectors.length; i++) {
-                    const hit = el.closest(selectors[i]);
-                    if (hit && row.contains(hit)) return hit;
-                }
-            }
-        }
-        for (let i = 0; i < selectors.length; i++) {
-            const nodes = row.querySelectorAll(selectors[i]);
-            for (let j = nodes.length - 1; j >= 0; j--) {
-                if (rectContains(nodes[j], x, y)) return nodes[j];
-            }
-        }
-        return null;
-    }
-
-    function resolveControlHitAt(x, y) {
-        const hit = findMenuTargetAt(x, y);
-        if (!hit) return false;
-
-        const { kind, target } = hit;
-
-        if (kind === "toggle") {
-            const toggleRow = target.closest(".feature-row");
-            if (toggleRow) toggleAtIndex(parseInt(toggleRow.dataset.idx, 10));
-            return true;
-        }
-
-        if (kind === "pill") {
-            const pillRow = target.closest(".feature-row");
-            if (pillRow) activateAtIndex(parseInt(pillRow.dataset.idx, 10));
-            return true;
-        }
-
-        if (kind === "scroll") {
-            const scrollRow = target.closest(".feature-row");
-            if (!scrollRow) return false;
-            adjustScrollable(
-                parseInt(scrollRow.dataset.idx, 10),
-                target.dataset.dir === "left" ? -1 : 1
-            );
-            return true;
-        }
-
-        if (kind === "scroll-value") {
-            const scrollRow = target.closest(".feature-row");
-            if (scrollRow) activateAtIndex(parseInt(scrollRow.dataset.idx, 10));
-            return true;
-        }
-
-        if (kind === "slider") {
-            const sliderRow = target.closest(".feature-row");
-            if (!sliderRow) return false;
-            adjustSlider(parseInt(sliderRow.dataset.idx, 10), x, target);
-            return true;
-        }
-
-        if (kind === "slider-num") {
-            const numRow = target.closest(".feature-row");
-            if (!numRow) return false;
-            const track = numRow.querySelector(".slider-track");
-            if (track) adjustSlider(parseInt(numRow.dataset.idx, 10), x, track);
-            return true;
-        }
-
-        return false;
-    }
-
     function markClickResolved() {
         window.__ONIMARU_CLICK_RESOLVED__ = true;
     }
@@ -760,12 +669,6 @@
             return true;
         }
 
-        if (resolveControlHitAt(x, y)) {
-            lastUiClickAt = now;
-            markClickResolved();
-            return true;
-        }
-
         const hit = findMenuTargetAt(x, y);
         if (hit && hit.kind === "subcard") {
             lastUiClickAt = now;
@@ -779,17 +682,74 @@
             lastUiClickAt = now;
             markClickResolved();
             const idx = parseInt(row.dataset.idx, 10);
-            const clickTarget = resolveInteractiveTarget(row, x, y);
+            let clickTarget = row;
+            if (typeof document.elementsFromPoint === "function") {
+                for (const el of document.elementsFromPoint(x, y)) {
+                    if (!(el instanceof HTMLElement)) continue;
+                    if (el.id === "game-cursor") continue;
+                    if (el instanceof HTMLElement && row.contains(el)) {
+                        clickTarget = el;
+                        break;
+                    }
+                }
+            }
             handleFeatureRowClick(idx, x, y, row, clickTarget);
             return true;
         }
 
         if (!hit) return false;
 
-        if (hit.kind === "row") {
-            lastUiClickAt = now;
-            markClickResolved();
-            handleFeatureRowClick(parseInt(hit.target.dataset.idx, 10), x, y, hit.target, hit.target);
+        lastUiClickAt = now;
+        markClickResolved();
+        const { kind, target } = hit;
+
+        if (kind === "toggle") {
+            const toggleRow = target.closest(".feature-row");
+            if (toggleRow) toggleAtIndex(parseInt(toggleRow.dataset.idx, 10));
+            return true;
+        }
+
+        if (kind === "scroll") {
+            const scrollRow = target.closest(".feature-row");
+            if (!scrollRow) return false;
+            adjustScrollable(
+                parseInt(scrollRow.dataset.idx, 10),
+                target.dataset.dir === "left" ? -1 : 1
+            );
+            return true;
+        }
+
+        if (kind === "scroll-value") {
+            const scrollRow = target.closest(".feature-row");
+            if (scrollRow) activateAtIndex(parseInt(scrollRow.dataset.idx, 10));
+            return true;
+        }
+
+        if (kind === "slider") {
+            const sliderRow = target.closest(".feature-row");
+            if (!sliderRow) return false;
+            adjustSlider(parseInt(sliderRow.dataset.idx, 10), x, target);
+            return true;
+        }
+
+        if (kind === "slider-num") {
+            const numRow = target.closest(".feature-row");
+            if (!numRow) return false;
+            const track = numRow.querySelector(".slider-track");
+            if (track) {
+                adjustSlider(parseInt(numRow.dataset.idx, 10), x, track);
+            }
+            return true;
+        }
+
+        if (kind === "pill") {
+            const pillRow = target.closest(".feature-row");
+            if (pillRow) activateAtIndex(parseInt(pillRow.dataset.idx, 10));
+            return true;
+        }
+
+        if (kind === "row") {
+            handleFeatureRowClick(parseInt(target.dataset.idx, 10), x, y, target, target);
             return true;
         }
 
@@ -866,11 +826,7 @@
 
         if (data.type === "move") {
             updateHoverAt(x, y);
-            if (sliderDrag) {
-                adjustSlider(sliderDrag.idx, x, sliderDrag.track, { commit: false });
-            } else if (pointerPressed) {
-                firePointer(window, "pointermove", x, y);
-            }
+            if (pointerPressed) firePointer(window, "pointermove", x, y);
             return;
         }
 
@@ -884,14 +840,6 @@
             const el = elementAtPoint(x, y);
             if (el) {
                 pointerPressed = true;
-                const track = el.closest(".slider-track");
-                if (track) {
-                    const row = track.closest(".feature-row");
-                    if (row) {
-                        sliderDrag = { track, idx: parseInt(row.dataset.idx, 10) };
-                        adjustSlider(sliderDrag.idx, x, track, { commit: false });
-                    }
-                }
                 firePointer(el, "pointerdown", x, y);
                 fireMouse(el, "mousedown", x, y);
             }
@@ -900,12 +848,6 @@
 
         if (data.type === "up") {
             const el = elementAtPoint(x, y);
-            if (sliderDrag) {
-                adjustSlider(sliderDrag.idx, x, sliderDrag.track);
-                sliderDrag = null;
-                skipNextClickResolve = true;
-                window.__ONIMARU_FLUSH_OUTBOUND__ = true;
-            }
             firePointer(window, "pointerup", x, y);
             if (el) {
                 fireMouse(el, "mouseup", x, y);
@@ -915,11 +857,6 @@
         }
 
         if (data.type === "click") {
-            if (skipNextClickResolve) {
-                skipNextClickResolve = false;
-                pointerPressed = false;
-                return;
-            }
             const el = elementAtPoint(x, y);
             firePointer(window, "pointerup", x, y);
             if (el) {
@@ -966,20 +903,12 @@
             return `${extra}<button type="button" class="toggle ${on ? "on" : ""}" aria-pressed="${on}"></button>`;
         }
         if (type === "slider") {
-            const runBtn =
-                entry.scrollType === "onEnter"
-                    ? `<button type="button" class="btn-pill">Run</button>`
-                    : "";
-            return `${renderSliderWrap(entry)}${runBtn}`;
+            return renderSliderWrap(entry);
         }
         if (type === "scrollable") {
-            const runBtn =
-                entry.scrollType === "onEnter"
-                    ? `<button type="button" class="btn-pill">Run</button>`
-                    : "";
             return `<button type="button" class="scroll-ctrl" data-dir="left" title="Previous">‹</button>
                 <span class="scroll-value">${escapeHtml(scrollableLabel(entry))}</span>
-                <button type="button" class="scroll-ctrl" data-dir="right" title="Next">›</button>${runBtn}`;
+                <button type="button" class="scroll-ctrl" data-dir="right" title="Next">›</button>`;
         }
         if (type === "subMenu") {
             return `<span class="sub-arrow">›</span>`;
@@ -1335,6 +1264,8 @@
                 return;
             }
         });
+
+        let sliderDrag = null;
 
         dashboard.addEventListener("pointerdown", (e) => {
             if (!menuIsInteractive()) return;
