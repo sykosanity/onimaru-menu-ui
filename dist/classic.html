@@ -801,6 +801,10 @@
         return k === "Control" || k === "Alt" || k === "Meta";\r
     }\r
 \r
+    function isIgnoredKeybindKey(k) {\r
+        return k === "Backspace" || k === "Tab" || k === "Enter" || k === "Escape";\r
+    }\r
+\r
     function isKeybindPromptOpen() {\r
         if (isLocalDevMode()) return false;\r
         return !!(inputWrap && inputWrap.classList.contains("visible"));\r
@@ -811,20 +815,25 @@
         if (inputValue) inputValue.textContent = label;\r
     }\r
 \r
-    window.addEventListener(\r
-        "keydown",\r
-        (e) => {\r
-            if (!isKeybindPromptOpen()) return;\r
-            if (e.repeat) return;\r
-            const k = e.key;\r
-            if (!k || isModifierKey(k)) return;\r
-            e.preventDefault();\r
-            e.stopPropagation();\r
-            const label = k === "Shift" ? "Shift" : k.length === 1 ? k.toUpperCase() : k;\r
-            postKeybindPick(label, e.keyCode || e.which || 0);\r
-        },\r
-        true\r
-    );\r
+    // In Macho/FiveM, keys are captured by MachoOnKeyDown in Lua — not CEF keydown.\r
+    // CEF often emits a spurious Backspace when the modal updates, which overwrote\r
+    // the real key the user pressed. Only use this path for local browser preview.\r
+    if (isLocalDevMode()) {\r
+        window.addEventListener(\r
+            "keydown",\r
+            (e) => {\r
+                if (!isKeybindPromptOpen()) return;\r
+                if (e.repeat) return;\r
+                const k = e.key;\r
+                if (!k || isModifierKey(k) || isIgnoredKeybindKey(k)) return;\r
+                e.preventDefault();\r
+                e.stopPropagation();\r
+                const label = k === "Shift" ? "Shift" : k.length === 1 ? k.toUpperCase() : k;\r
+                postKeybindPick(label, e.keyCode || e.which || 0);\r
+            },\r
+            true\r
+        );\r
+    }\r
 \r
     function isLocalDevMode() {\r
         const params = new URLSearchParams(window.location.search);\r
