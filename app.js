@@ -537,6 +537,15 @@
         return state.visible || dashboard.classList.contains("visible");
     }
 
+    function findFeatureRowAt(x, y) {
+        if (!contentEl) return null;
+        const rows = contentEl.querySelectorAll(".feature-row");
+        for (let i = rows.length - 1; i >= 0; i--) {
+            if (rectContains(rows[i], x, y)) return rows[i];
+        }
+        return null;
+    }
+
     function resolveMenuActionAt(x, y) {
         if (!menuIsInteractive()) return false;
 
@@ -544,72 +553,94 @@
         if (now - lastUiClickAt < 120) return false;
 
         const hit = findMenuTargetAt(x, y);
+        if (hit && (hit.kind === "tab" || hit.kind === "nav" || hit.kind === "subcard")) {
+            lastUiClickAt = now;
+            const { kind, target } = hit;
+
+            if (kind === "tab") {
+                if (target.dataset.uiAction === "back") {
+                    emitToGame({ action: "back" });
+                } else {
+                    switchCategory(parseInt(target.dataset.tabIndex, 10));
+                }
+                return true;
+            }
+
+            if (kind === "nav" && target.dataset.sidebar) {
+                openSidebarSection(target.dataset.sidebar);
+                return true;
+            }
+
+            if (kind === "subcard") {
+                activateAtIndex(parseInt(target.dataset.idx, 10));
+                return true;
+            }
+        }
+
+        const row = findFeatureRowAt(x, y);
+        if (row) {
+            lastUiClickAt = now;
+            const idx = parseInt(row.dataset.idx, 10);
+            let clickTarget = row;
+            if (typeof document.elementsFromPoint === "function") {
+                for (const el of document.elementsFromPoint(x, y)) {
+                    if (el instanceof HTMLElement && row.contains(el)) {
+                        clickTarget = el;
+                        break;
+                    }
+                }
+            }
+            handleFeatureRowClick(idx, x, y, row, clickTarget);
+            return true;
+        }
+
         if (!hit) return false;
 
         lastUiClickAt = now;
         const { kind, target } = hit;
 
         if (kind === "toggle") {
-            const row = target.closest(".feature-row");
-            if (row) toggleAtIndex(parseInt(row.dataset.idx, 10));
+            const toggleRow = target.closest(".feature-row");
+            if (toggleRow) toggleAtIndex(parseInt(toggleRow.dataset.idx, 10));
             return true;
         }
 
         if (kind === "scroll") {
-            const row = target.closest(".feature-row");
-            if (!row) return false;
+            const scrollRow = target.closest(".feature-row");
+            if (!scrollRow) return false;
             adjustScrollable(
-                parseInt(row.dataset.idx, 10),
+                parseInt(scrollRow.dataset.idx, 10),
                 target.dataset.dir === "left" ? -1 : 1
             );
             return true;
         }
 
         if (kind === "scroll-value") {
-            const row = target.closest(".feature-row");
-            if (row) activateAtIndex(parseInt(row.dataset.idx, 10));
+            const scrollRow = target.closest(".feature-row");
+            if (scrollRow) activateAtIndex(parseInt(scrollRow.dataset.idx, 10));
             return true;
         }
 
         if (kind === "slider") {
-            const row = target.closest(".feature-row");
-            if (!row) return false;
-            adjustSlider(parseInt(row.dataset.idx, 10), x, target);
+            const sliderRow = target.closest(".feature-row");
+            if (!sliderRow) return false;
+            adjustSlider(parseInt(sliderRow.dataset.idx, 10), x, target);
             return true;
         }
 
         if (kind === "slider-num") {
-            const row = target.closest(".feature-row");
-            if (!row) return false;
-            const track = row.querySelector(".slider-track");
+            const numRow = target.closest(".feature-row");
+            if (!numRow) return false;
+            const track = numRow.querySelector(".slider-track");
             if (track) {
-                adjustSlider(parseInt(row.dataset.idx, 10), x, track);
+                adjustSlider(parseInt(numRow.dataset.idx, 10), x, track);
             }
             return true;
         }
 
         if (kind === "pill") {
-            const row = target.closest(".feature-row");
-            if (row) activateAtIndex(parseInt(row.dataset.idx, 10));
-            return true;
-        }
-
-        if (kind === "tab") {
-            if (target.dataset.uiAction === "back") {
-                emitToGame({ action: "back" });
-            } else {
-                switchCategory(parseInt(target.dataset.tabIndex, 10));
-            }
-            return true;
-        }
-
-        if (kind === "nav" && target.dataset.sidebar) {
-            openSidebarSection(target.dataset.sidebar);
-            return true;
-        }
-
-        if (kind === "subcard") {
-            activateAtIndex(parseInt(target.dataset.idx, 10));
+            const pillRow = target.closest(".feature-row");
+            if (pillRow) activateAtIndex(parseInt(pillRow.dataset.idx, 10));
             return true;
         }
 
@@ -951,7 +982,6 @@
     function applyPayload(data) {
         if (typeof data.visible === "boolean") state.visible = data.visible;
         if (typeof data.username === "string") state.username = data.username;
-        if (data.elements) state.elements = data.elements;
         if (typeof data.index === "number") state.index = data.index;
         if (data.categories) state.categories = data.categories;
         else if (data.action === "showUI" && data.visible === false) state.categories = null;
@@ -961,7 +991,16 @@
         if (data.sidebarActive !== undefined) state.sidebarActive = data.sidebarActive;
         if (data.bannerColor) setMenuColor(data.bannerColor);
 
-        if (state.categories?.length) {
+        if (data.elements) {
+            state.elements = data.elements;
+            // Lua updateElements sends fresh tabs; keep category copy in sync so clicks/toggles stick.
+            if (state.categories?.length) {
+                const catIdx = Math.max(0, Math.min(state.categories.length - 1, state.categoryIndex || 0));
+                state.categoryIndex = catIdx;
+                const cat = state.categories[catIdx];
+                if (cat) cat.tabs = data.elements;
+            }
+        } else if (state.categories?.length) {
             const catIdx = Math.max(0, Math.min(state.categories.length - 1, state.categoryIndex || 0));
             state.categoryIndex = catIdx;
             const catTabs = state.categories[catIdx]?.tabs;
