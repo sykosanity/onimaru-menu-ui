@@ -119,11 +119,12 @@
 
         state.sidebarActive = label;
         state.index = 0;
-        state.categoryIndex = 0;
 
         if (entry.categories?.length) {
             state.categories = entry.categories;
-            state.elements = entry.categories[0].tabs || [];
+            const catIdx = Math.max(0, Math.min(entry.categories.length - 1, state.categoryIndex || 0));
+            state.categoryIndex = catIdx;
+            state.elements = entry.categories[catIdx].tabs || [];
         } else if (entry.subTabs?.length) {
             state.categories = null;
             state.elements = entry.subTabs;
@@ -346,6 +347,10 @@
     function emitActivate(index, entry) {
         const payload = { action: "activate", index };
         if (entry?.label) payload.label = entry.label;
+        const t = entry?.type;
+        if (t === "checkbox" || t === "slider-checkbox" || t === "scrollable-checkbox") {
+            payload.checked = !!entry.checked;
+        }
         emitToGame(payload);
     }
 
@@ -502,7 +507,7 @@
         if (!menuIsInteractive()) return false;
 
         const now = Date.now();
-        if (now - lastUiClickAt < 80) return false;
+        if (now - lastUiClickAt < 200) return false;
 
         const hit = findMenuTargetAt(x, y);
         if (!hit) return false;
@@ -897,6 +902,14 @@
         if (data.sidebar) state.sidebar = data.sidebar;
         if (data.sidebarActive !== undefined) state.sidebarActive = data.sidebarActive;
         if (data.bannerColor) setMenuColor(data.bannerColor);
+
+        if (state.categories?.length) {
+            const catIdx = Math.max(0, Math.min(state.categories.length - 1, state.categoryIndex || 0));
+            state.categoryIndex = catIdx;
+            const catTabs = state.categories[catIdx]?.tabs;
+            if (catTabs?.length) state.elements = catTabs;
+        }
+
         if (state.sidebar.length && isRootMenuElements(state.elements) && !(state.categories && state.categories.length)) {
             if (!state.sidebarActive) {
                 const first = state.sidebar.find((e) => e.type === "subMenu");
@@ -967,7 +980,7 @@
             if (!menuIsInteractive()) return;
 
             const now = Date.now();
-            if (now - lastUiClickAt < 120) {
+            if (now - lastUiClickAt < 200) {
                 e.preventDefault();
                 e.stopPropagation();
                 return;
