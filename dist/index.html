@@ -361,16 +361,21 @@
     }\r
 \r
     function toggleAtIndex(index) {\r
-        mutateActiveTabs((tabs) => {\r
-            const tab = tabs[index];\r
-            if (!tab) return;\r
-            if (tab.type === "checkbox" || tab.type === "slider-checkbox" || tab.type === "scrollable-checkbox") {\r
-                tab.checked = !tab.checked;\r
-            }\r
-        });\r
+        const tabs = getActiveTabs();\r
+        const tab = tabs?.[index];\r
+        if (!tab) return;\r
+        const t = tab.type;\r
+        if (t !== "checkbox" && t !== "slider-checkbox" && t !== "scrollable-checkbox") return;\r
+\r
+        const nextChecked = !tab.checked;\r
         state.index = index;\r
-        const tab = getActiveTabs()[index];\r
-        emitActivate(index, tab);\r
+        tab.checked = nextChecked;\r
+        emitToGame({\r
+            action: "activate",\r
+            index,\r
+            label: tab.label,\r
+            checked: nextChecked,\r
+        });\r
         render();\r
     }\r
 \r
