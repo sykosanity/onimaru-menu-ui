@@ -1254,6 +1254,11 @@
         switchCategory,
         activateAtIndex,
         toggleAtIndex,
+        clickAt: (nx, ny) => handleInjectedMouse({ action: "mouse", type: "click", x: nx, y: ny }),
+    };
+
+    window.__ONIMARU_CLICK_AT__ = function (nx, ny) {
+        handleInjectedMouse({ action: "mouse", type: "click", x: nx, y: ny });
     };
 
     bindInteractions();
