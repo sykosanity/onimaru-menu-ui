@@ -353,10 +353,6 @@
     function emitActivate(index, entry) {\r
         const payload = { action: "activate", index };\r
         if (entry?.label) payload.label = entry.label;\r
-        const t = entry?.type;\r
-        if (t === "checkbox" || t === "slider-checkbox" || t === "scrollable-checkbox") {\r
-            payload.checked = !!entry.checked;\r
-        }\r
         emitToGame(payload);\r
     }\r
 \r
@@ -367,16 +363,8 @@
         const t = tab.type;\r
         if (t !== "checkbox" && t !== "slider-checkbox" && t !== "scrollable-checkbox") return;\r
 \r
-        const nextChecked = !tab.checked;\r
         state.index = index;\r
-        tab.checked = nextChecked;\r
-        emitToGame({\r
-            action: "activate",\r
-            index,\r
-            label: tab.label,\r
-            checked: nextChecked,\r
-        });\r
-        render();\r
+        emitToGame({ action: "activate", index, label: tab.label });\r
     }\r
 \r
     function activateAtIndex(index) {\r
