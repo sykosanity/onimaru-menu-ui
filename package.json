@@ -8,7 +8,7 @@
     "extract-mock": "node scripts/extractMockMenu.mjs",
     "build": "vite build",
     "preview": "vite preview --port 5173",
-    "deploy:pages": "npm run build && npx --yes gh-pages -d dist -t true"
+    "deploy:pages": "npm run build && node scripts/publish-pages-root.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
