@@ -54,12 +54,19 @@ ${bundleScript}
 export default defineConfig({
   base: "./",
   plugins: [viteSingleFile(), reorderClassicHtmlForMacho()],
+  esbuild: {
+    target: "es5",
+    supported: {
+      "nullish-coalescing": false,
+      "optional-chain": false,
+    },
+  },
   build: {
-    target: "es2018",
+    target: "es5",
     modulePreload: false,
     rollupOptions: {
       input: {
-        index: resolve(__dirname, "classic.html"),
+        index: resolve(__dirname, "src/classic.html"),
       },
     },
   },
