@@ -573,7 +573,7 @@
     function emitActivate(index, entry) {
         const payload = { action: "activate", index, ...uiOutboundExtras() };
         if (entry?.label) payload.label = entry.label;
-        emitToGame(payload);
+        notifyGame(payload);
     }
 
     function toggleAtIndex(index) {
@@ -867,7 +867,7 @@
         if (!contentEl) return null;
         const pills = contentEl.querySelectorAll(".btn-pill");
         for (let i = pills.length - 1; i >= 0; i--) {
-            if (rectContains(pills[i], x, y)) return pills[i];
+            if (rectHitExpanded(pills[i], x, y, 8, 12)) return pills[i];
         }
         return null;
     }
@@ -877,6 +877,8 @@
 
         const now = Date.now();
         if (now - lastUiClickAt < 120) return false;
+
+        window.__ONIMARU_CLICK_RESULT__ = null;
 
         if (resolveChromeClickAt(x, y)) {
             lastUiClickAt = now;
