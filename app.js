@@ -541,6 +541,36 @@
         return null;
     }
 
+    function compactClickPayload(payload) {
+        if (!payload || !payload.action) return "";
+        const esc = (s) => String(s || "").replace(/\|/g, "\\|");
+        switch (payload.action) {
+            case "openSidebar":
+                return "S:" + esc(payload.label);
+            case "category":
+                return "C:" + String(payload.index ?? 0);
+            case "back":
+                return "B";
+            case "select":
+                return "N:" + String(payload.index ?? 0);
+            case "activate":
+                return (
+                    "A:" +
+                    String(payload.index ?? 0) +
+                    ":" +
+                    (payload.checked ? "1" : "0") +
+                    ":" +
+                    esc(payload.label)
+                );
+            case "scroll":
+                return "R:" + String(payload.index ?? 0) + ":" + (payload.dir === "left" ? "L" : "R");
+            case "slider":
+                return "V:" + String(payload.index ?? 0) + ":" + String(payload.pct ?? payload.value ?? 0);
+            default:
+                return "";
+        }
+    }
+
     function emitActivate(index, entry) {
         const payload = { action: "activate", index, ...uiOutboundExtras() };
         if (entry?.label) payload.label = entry.label;
@@ -1736,6 +1766,8 @@
         toggleAtIndex,
         clickAt: (nx, ny) => handleInjectedMouse({ action: "mouse", type: "click", x: nx, y: ny }),
     };
+
+    window.__ONIMARU_COMPACT_CLICK__ = compactClickPayload;
 
     window.__ONIMARU_CLICK_AT__ = function (nx, ny) {
         window.__ONIMARU_CLICK_RESULT__ = null;
