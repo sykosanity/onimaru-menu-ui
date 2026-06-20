@@ -626,6 +626,7 @@
 
             state.index = idx;
             tab.checked = !tab.checked;
+            stageToggleStateForLua(tab.label, tab.checked);
             render();
             const payload = gamePayload({
                 action: "activate",
@@ -650,6 +651,24 @@
         notifyGame(payload);
     }
 
+    function stageToggleStateForLua(label, checked) {
+        try {
+            document.body.setAttribute("data-oni-toggle-label", String(label || ""));
+            document.body.setAttribute("data-oni-toggle-checked", checked ? "1" : "0");
+        } catch {
+            /* ignore */
+        }
+    }
+
+    function clearToggleStageForLua() {
+        try {
+            document.body.removeAttribute("data-oni-toggle-label");
+            document.body.removeAttribute("data-oni-toggle-checked");
+        } catch {
+            /* ignore */
+        }
+    }
+
     function toggleAtIndex(index) {
         const tabs = getActiveTabs();
         const tab = tabs?.[index];
@@ -659,6 +678,7 @@
 
         state.index = index;
         tab.checked = !tab.checked;
+        stageToggleStateForLua(tab.label, tab.checked);
         render();
         notifyGame(
             gamePayload({
@@ -1962,6 +1982,7 @@
         }
         window.__ONIMARU_POINTER_CONSUMED__ = false;
         window.__ONIMARU_INJECT_RESULT__ = "";
+        clearToggleStageForLua();
         updatePointerHitMap();
         const { x, y } = pointerFromNorm(nx, ny);
         let compact = "";
