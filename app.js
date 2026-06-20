@@ -657,6 +657,30 @@
         return false;
     }
 
+    function rectHitExpanded(el, x, y, padX, padY) {
+        const r = el.getBoundingClientRect();
+        return x >= r.left - padX && x <= r.right + padX && y >= r.top - padY && y <= r.bottom + padY;
+    }
+
+    function findToggleAt(x, y) {
+        if (!contentEl) return null;
+        const toggles = contentEl.querySelectorAll(".toggle");
+        for (let i = toggles.length - 1; i >= 0; i--) {
+            const el = toggles[i];
+            if (rectHitExpanded(el, x, y, 6, 10)) return el;
+        }
+        return null;
+    }
+
+    function findPillAt(x, y) {
+        if (!contentEl) return null;
+        const pills = contentEl.querySelectorAll(".btn-pill");
+        for (let i = pills.length - 1; i >= 0; i--) {
+            if (rectContains(pills[i], x, y)) return pills[i];
+        }
+        return null;
+    }
+
     function resolveMenuActionAt(x, y) {
         if (!menuIsInteractive()) return false;
 
@@ -667,6 +691,28 @@
             lastUiClickAt = now;
             markClickResolved();
             return true;
+        }
+
+        const toggle = findToggleAt(x, y);
+        if (toggle) {
+            const toggleRow = toggle.closest(".feature-row");
+            if (toggleRow) {
+                lastUiClickAt = now;
+                markClickResolved();
+                toggleAtIndex(parseInt(toggleRow.dataset.idx, 10));
+                return true;
+            }
+        }
+
+        const pill = findPillAt(x, y);
+        if (pill) {
+            const pillRow = pill.closest(".feature-row");
+            if (pillRow) {
+                lastUiClickAt = now;
+                markClickResolved();
+                activateAtIndex(parseInt(pillRow.dataset.idx, 10));
+                return true;
+            }
         }
 
         const hit = findMenuTargetAt(x, y);
