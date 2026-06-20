@@ -281,9 +281,11 @@
         selectIndex(idx);
     }
 
-    function rectContains(el, x, y) {
+    function rectContains(el, x, y, padX, padY) {
         const r = el.getBoundingClientRect();
-        return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+        const px = padX || 0;
+        const py = padY || 0;
+        return x >= r.left - px && x <= r.right + px && y >= r.top - py && y <= r.bottom + py;
     }
 
     function findMenuTargetAt(x, y) {
@@ -758,18 +760,38 @@
 
     function findNavAt(x, y) {
         if (!sidebarNav) return null;
+
+        if (typeof document.elementsFromPoint === "function") {
+            for (const el of document.elementsFromPoint(x, y)) {
+                if (!(el instanceof HTMLElement)) continue;
+                if (el.id === "game-cursor") continue;
+                const nav = el.closest(".nav-item");
+                if (nav && sidebarNav.contains(nav)) return nav;
+            }
+        }
+
         const items = sidebarNav.querySelectorAll(".nav-item");
         for (let i = items.length - 1; i >= 0; i--) {
-            if (rectContains(items[i], x, y)) return items[i];
+            if (rectContains(items[i], x, y, 2, 2)) return items[i];
         }
         return null;
     }
 
     function findTabAt(x, y) {
         if (!tabNav) return null;
+
+        if (typeof document.elementsFromPoint === "function") {
+            for (const el of document.elementsFromPoint(x, y)) {
+                if (!(el instanceof HTMLElement)) continue;
+                if (el.id === "game-cursor") continue;
+                const tab = el.closest(".tab-item");
+                if (tab && tabNav.contains(tab)) return tab;
+            }
+        }
+
         const items = tabNav.querySelectorAll(".tab-item");
         for (let i = items.length - 1; i >= 0; i--) {
-            if (rectContains(items[i], x, y)) return items[i];
+            if (rectContains(items[i], x, y, 2, 2)) return items[i];
         }
         return null;
     }

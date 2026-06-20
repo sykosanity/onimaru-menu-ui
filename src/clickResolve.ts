@@ -30,7 +30,8 @@ export type MenuEntryType =
 
 function readIndex(el: Element | null): number | null {
   if (!el) return null;
-  const raw = el.closest("[data-index]")?.getAttribute("data-index");
+  const host = el.closest("[data-idx], [data-index]");
+  const raw = host?.getAttribute("data-idx") ?? host?.getAttribute("data-index");
   if (raw == null) return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
@@ -66,14 +67,15 @@ export function resolveHoverAt(x: number, y: number): HoverTarget | null {
 
   const nav = hit.closest(".nav-item");
   if (nav instanceof HTMLElement) {
-    const label = nav.getAttribute("data-label") || nav.querySelector("span:last-child")?.textContent?.trim();
+    const label = nav.getAttribute("data-sidebar") || nav.getAttribute("data-label") || nav.querySelector("span:last-child")?.textContent?.trim();
     if (label) return { kind: "nav", label };
   }
 
   const tab = hit.closest(".tab-item");
   if (tab instanceof HTMLElement && !tab.textContent?.includes("Back")) {
-    const idx = readIndex(tab);
-    if (idx != null) return { kind: "tab", index: idx };
+    const rawIdx = tab.getAttribute("data-tab-index") ?? tab.getAttribute("data-index");
+    const idx = rawIdx != null ? Number(rawIdx) : null;
+    if (idx != null && Number.isFinite(idx)) return { kind: "tab", index: idx };
   }
 
   const row = hit.closest(".feature-row");
@@ -105,14 +107,15 @@ export function resolveClickAt(x: number, y: number): ClickHit | null {
 
   const nav = hit.closest(".nav-item");
   if (nav instanceof HTMLElement) {
-    const label = nav.getAttribute("data-label") || nav.querySelector("span:last-child")?.textContent?.trim();
+    const label = nav.getAttribute("data-sidebar") || nav.getAttribute("data-label") || nav.querySelector("span:last-child")?.textContent?.trim();
     if (label) return { kind: "sidebar", label };
   }
 
   const tab = hit.closest(".tab-item");
   if (tab instanceof HTMLElement) {
-    const idx = readIndex(tab);
-    if (idx != null) return { kind: "category", index: idx };
+    const rawIdx = tab.getAttribute("data-tab-index") ?? tab.getAttribute("data-index");
+    const idx = rawIdx != null ? Number(rawIdx) : null;
+    if (idx != null && Number.isFinite(idx)) return { kind: "category", index: idx };
   }
 
   const submenu = hit.closest(".submenu-card");
