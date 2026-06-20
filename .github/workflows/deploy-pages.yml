@@ -7,12 +7,11 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: true
+# Pages is configured as legacy "deploy from branch / main / root".
+# classic.html + index.html at repo root are what GitHub Pages serves — not the dist/ artifact.
+# Rapid pushes + cancel-in-progress used to leave a stale "in progress" Actions deployment
+# that blocked later deploy jobs (even though they were redundant).
 
 jobs:
   build:
@@ -27,20 +26,17 @@ jobs:
 
       - run: npm ci
       - run: npm run build
+      - run: node scripts/publish-pages-root.mjs
 
-      - name: Add .nojekyll for Pages
-        run: touch dist/.nojekyll
+      - name: Verify published root bundles match dist
+        run: |
+          cmp -s dist/classic.html classic.html
+          cmp -s dist/index.html index.html
+          test -f .nojekyll
 
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/deploy-pages@v4
-        id: deployment
+      - name: Remind if root HTML was not committed
+        run: |
+          if ! git diff --quiet classic.html index.html .nojekyll 2>/dev/null; then
+            echo "::warning::classic.html / index.html differ from last commit."
+            echo "Run 'npm run deploy:pages' locally and commit the updated root HTML so legacy Pages picks up the bundle."
+          fi
