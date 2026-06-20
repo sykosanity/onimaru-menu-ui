@@ -489,6 +489,18 @@ body.menu-open #game-cursor {
     color: var(--text);
 }
 
+.feature-row[data-type="checkbox"],
+.feature-row[data-type="scrollable-checkbox"] {
+    cursor: default;
+}
+
+.feature-row[data-type="checkbox"] .feature-icon,
+.feature-row[data-type="checkbox"] .feature-body,
+.feature-row[data-type="scrollable-checkbox"] .feature-icon,
+.feature-row[data-type="scrollable-checkbox"] .feature-body {
+    pointer-events: none;
+}
+
 .feature-icon {
     width: 32px;
     height: 32px;

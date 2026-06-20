@@ -232,19 +232,36 @@
         const entry = getActiveTabs()[idx];
         if (!entry || entry.type === "divider") return;
 
+        if (entry.type === "checkbox") {
+            if (clickTarget?.closest(".toggle")) {
+                toggleAtIndex(idx);
+            }
+            return;
+        }
+
+        if (entry.type === "scrollable-checkbox") {
+            if (clickTarget?.closest(".toggle")) {
+                toggleAtIndex(idx);
+                return;
+            }
+            const scrollCtrl = clickTarget?.closest(".scroll-ctrl");
+            if (scrollCtrl) {
+                adjustScrollable(idx, scrollCtrl.dataset.dir === "left" ? -1 : 1);
+            }
+            return;
+        }
+
         state.index = idx;
 
         if (entry.type === "slider-checkbox") {
-            if (clickTarget && clickTarget.closest(".toggle")) {
+            if (clickTarget?.closest(".toggle")) {
                 toggleAtIndex(idx);
                 return;
             }
             const track = row.querySelector(".slider-track");
             if (track && clickTarget && (clickTarget.closest(".slider-wrap") || clickTarget.closest(".slider-track") || clickTarget.closest(".slider-num"))) {
                 adjustSlider(idx, x, track);
-                return;
             }
-            toggleAtIndex(idx);
             return;
         }
 
@@ -255,11 +272,6 @@
                 return;
             }
             activateAtIndex(idx);
-            return;
-        }
-
-        if (entry.type === "checkbox" || entry.type === "scrollable-checkbox") {
-            toggleAtIndex(idx);
             return;
         }
 
@@ -465,7 +477,7 @@
                 const pct = Math.max(0, Math.min(1, (x - rect.left) / Math.max(1, rect.width)));
                 return gamePayload({ action: "slider", index: idx, label: entry.label, pct });
             }
-            return buildActivatePayload(idx, true);
+            return null;
         }
 
         if (entry.type === "slider") {
@@ -479,7 +491,10 @@
         }
 
         if (entry.type === "checkbox" || entry.type === "scrollable-checkbox") {
-            return buildActivatePayload(idx, true);
+            if (clickTarget?.closest(".toggle")) {
+                return buildActivatePayload(idx, true);
+            }
+            return null;
         }
 
         if (rowActivatesOnClick(entry)) {
@@ -685,7 +700,6 @@
         }
 
         if (entry.type === "checkbox" || entry.type === "slider-checkbox" || entry.type === "scrollable-checkbox") {
-            toggleAtIndex(index);
             return;
         }
 
@@ -1080,9 +1094,7 @@
         }
 
         if (kind === "scroll-value") {
-            const scrollRow = target.closest(".feature-row");
-            if (scrollRow) activateAtIndex(parseInt(scrollRow.dataset.idx, 10));
-            return true;
+            return false;
         }
 
         if (kind === "slider") {
@@ -1109,7 +1121,19 @@
         }
 
         if (kind === "row") {
-            handleFeatureRowClick(parseInt(target.dataset.idx, 10), x, y, target, target);
+            const idx = parseInt(target.dataset.idx, 10);
+            let clickTarget = target;
+            if (typeof document.elementsFromPoint === "function") {
+                for (const el of document.elementsFromPoint(x, y)) {
+                    if (!(el instanceof HTMLElement)) continue;
+                    if (el.id === "game-cursor") continue;
+                    if (target.contains(el)) {
+                        clickTarget = el;
+                        break;
+                    }
+                }
+            }
+            handleFeatureRowClick(idx, x, y, target, clickTarget);
             return true;
         }
 
@@ -1313,7 +1337,7 @@
 
         const showDots = type === "slider" || type === "slider-checkbox" || type === "scrollable";
 
-        return `<div class="feature-row ${isActive ? "active" : ""}" data-idx="${item.index}">
+        return `<div class="feature-row ${isActive ? "active" : ""}" data-idx="${item.index}" data-type="${type}">
             <div class="feature-icon">${iconFor(entry.label)}</div>
             <div class="feature-body">
                 <div class="feature-label">${escapeHtml(entry.label || "")}</div>
