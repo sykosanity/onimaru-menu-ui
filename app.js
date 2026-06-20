@@ -157,11 +157,11 @@
     }
 
     function openSidebarSection(label) {
-        if (luaOwnsClicks()) {
-            emitToGame({ action: "openSidebar", label });
-            return;
-        }
         if (!loadSidebarSection(label)) {
+            if (isGameMode()) {
+                stageClickPayload(gamePayload({ action: "openSidebar", label }));
+                return;
+            }
             state.sidebarActive = label;
             emitToGame({ action: "openSidebar", label });
             render();
@@ -213,8 +213,8 @@
 
     function switchCategory(index) {
         if (!state.categories || !state.categories.length) return;
-        if (luaOwnsClicks()) {
-            emitToGame({ action: "category", index });
+        if (isGameMode()) {
+            stageClickPayload(gamePayload({ action: "category", index }));
             return;
         }
         state.categoryIndex = index;
@@ -410,6 +410,137 @@
         return extra;
     }
 
+    function gamePayload(base) {
+        return { source: "onimaru-ui", ...base, ...uiOutboundExtras() };
+    }
+
+    function markClickResolved() {
+        window.__ONIMARU_CLICK_RESOLVED__ = true;
+    }
+
+    function stageClickPayload(payload) {
+        if (!payload) return;
+        window.__ONIMARU_CLICK_RESULT__ = payload;
+        window.__ONIMARU_LAST_MSG__ = payload;
+        markClickResolved();
+    }
+
+    function buildActivatePayload(index, flipToggle) {
+        const tab = getActiveTabs()[index];
+        if (!tab) return null;
+        const payload = { action: "activate", index, label: tab.label };
+        if (flipToggle) payload.checked = !tab.checked;
+        return gamePayload(payload);
+    }
+
+    function resolveRowClickPayload(idx, x, row, clickTarget) {
+        const entry = getActiveTabs()[idx];
+        if (!entry || entry.type === "divider") return null;
+
+        if (entry.type === "slider-checkbox") {
+            if (clickTarget?.closest(".toggle")) {
+                return buildActivatePayload(idx, true);
+            }
+            const track = row.querySelector(".slider-track");
+            if (
+                track &&
+                clickTarget &&
+                (clickTarget.closest(".slider-wrap") ||
+                    clickTarget.closest(".slider-track") ||
+                    clickTarget.closest(".slider-num"))
+            ) {
+                const rect = track.getBoundingClientRect();
+                const pct = Math.max(0, Math.min(1, (x - rect.left) / Math.max(1, rect.width)));
+                return gamePayload({ action: "slider", index: idx, label: entry.label, pct });
+            }
+            return buildActivatePayload(idx, true);
+        }
+
+        if (entry.type === "slider") {
+            const track = row.querySelector(".slider-track");
+            if (track) {
+                const rect = track.getBoundingClientRect();
+                const pct = Math.max(0, Math.min(1, (x - rect.left) / Math.max(1, rect.width)));
+                return gamePayload({ action: "slider", index: idx, label: entry.label, pct });
+            }
+            return buildActivatePayload(idx, false);
+        }
+
+        if (entry.type === "checkbox" || entry.type === "scrollable-checkbox") {
+            return buildActivatePayload(idx, true);
+        }
+
+        if (rowActivatesOnClick(entry)) {
+            return buildActivatePayload(idx, false);
+        }
+
+        return gamePayload({ action: "select", index: idx });
+    }
+
+    function resolveClickPayloadAt(x, y) {
+        if (!menuIsInteractive()) return null;
+
+        const nav = findNavAt(x, y);
+        if (nav?.dataset.sidebar) {
+            return gamePayload({ action: "openSidebar", label: nav.dataset.sidebar });
+        }
+
+        const tab = findTabAt(x, y);
+        if (tab) {
+            if (tab.dataset.uiAction === "back") {
+                return gamePayload({ action: "back" });
+            }
+            return gamePayload({ action: "category", index: parseInt(tab.dataset.tabIndex, 10) });
+        }
+
+        const toggle = findToggleAt(x, y);
+        if (toggle) {
+            const row = toggle.closest(".feature-row");
+            if (row) return buildActivatePayload(parseInt(row.dataset.idx, 10), true);
+        }
+
+        const pill = findPillAt(x, y);
+        if (pill) {
+            const row = pill.closest(".feature-row");
+            if (row) return buildActivatePayload(parseInt(row.dataset.idx, 10), false);
+        }
+
+        const hit = findMenuTargetAt(x, y);
+        if (hit?.kind === "subcard") {
+            return buildActivatePayload(parseInt(hit.target.dataset.idx, 10), false);
+        }
+
+        const row = findFeatureRowAt(x, y);
+        if (row) {
+            const idx = parseInt(row.dataset.idx, 10);
+            let clickTarget = row;
+            if (typeof document.elementsFromPoint === "function") {
+                for (const el of document.elementsFromPoint(x, y)) {
+                    if (!(el instanceof HTMLElement)) continue;
+                    if (el.id === "game-cursor") continue;
+                    if (row.contains(el)) {
+                        clickTarget = el;
+                        break;
+                    }
+                }
+            }
+            return resolveRowClickPayload(idx, x, row, clickTarget);
+        }
+
+        if (hit?.kind === "scroll") {
+            const scrollRow = hit.target.closest(".feature-row");
+            if (scrollRow) {
+                return gamePayload({
+                    action: "scroll",
+                    index: parseInt(scrollRow.dataset.idx, 10),
+                    dir: hit.target.dataset.dir === "left" ? "left" : "right",
+                });
+            }
+        }
+
+        return null;
+    }
+
     function emitActivate(index, entry) {
         const payload = { action: "activate", index, ...uiOutboundExtras() };
         if (entry?.label) payload.label = entry.label;
@@ -424,22 +555,14 @@
         if (t !== "checkbox" && t !== "slider-checkbox" && t !== "scrollable-checkbox") return;
 
         state.index = index;
-        const nextChecked = !tab.checked;
-        const payload = {
-            action: "activate",
-            index,
-            label: tab.label,
-            checked: nextChecked,
-            ...uiOutboundExtras(),
-        };
-
-        if (luaOwnsClicks()) {
-            emitToGame(payload);
+        const payload = buildActivatePayload(index, true);
+        if (isGameMode()) {
+            stageClickPayload(payload);
             return;
         }
 
         emitToGame(payload);
-        tab.checked = nextChecked;
+        tab.checked = !tab.checked;
         render();
     }
 
@@ -449,12 +572,6 @@
             : state.elements;
         const entry = list?.[index];
         if (!entry) return;
-
-        if (luaOwnsClicks()) {
-            state.index = index;
-            emitActivate(index, entry);
-            return;
-        }
 
         state.index = index;
 
@@ -664,10 +781,6 @@
                 render();
             }
         });
-    }
-
-    function markClickResolved() {
-        window.__ONIMARU_CLICK_RESOLVED__ = true;
     }
 
     function resolveChromeClickAt(x, y) {
@@ -1479,10 +1592,6 @@
         return !isLocalDevMode();
     }
 
-    function luaOwnsClicks() {
-        return isGameMode() || window.__ONIMARU_LUA_OWNS_CLICKS__ === true;
-    }
-
     function processMessage(data) {
         if (!data || !data.action) return;
 
@@ -1629,17 +1738,9 @@
     };
 
     window.__ONIMARU_CLICK_AT__ = function (nx, ny) {
-        if (window.__ONIMARU_LUA_OWNS_CLICKS__) {
-            return window.__ONIMARU_POINTER_AT__(nx, ny, "click");
-        }
-        window.__ONIMARU_LAST_MSG__ = null;
+        window.__ONIMARU_CLICK_RESULT__ = null;
         window.__ONIMARU_CLICK_RESOLVED__ = false;
-        handleInjectedMouse({ action: "mouse", type: "click", x: nx, y: ny });
-        return window.__ONIMARU_LAST_MSG__;
-    };
 
-    window.__ONIMARU_POINTER_AT__ = function (nx, ny, phase) {
-        if (typeof nx !== "number" || typeof ny !== "number") return null;
         const { x, y } = pointerFromNorm(nx, ny);
 
         let gc = document.getElementById("game-cursor");
@@ -1657,10 +1758,16 @@
 
         if (!menuIsInteractive()) return null;
 
-        if (phase === "click" || phase === "move") {
-            updateHoverAt(x, y);
+        updateHoverAt(x, y);
+
+        if (isGameMode()) {
+            const payload = resolveClickPayloadAt(x, y);
+            if (payload) stageClickPayload(payload);
+            return payload;
         }
-        return null;
+
+        handleInjectedMouse({ action: "mouse", type: "click", x: nx, y: ny });
+        return window.__ONIMARU_LAST_MSG__;
     };
 
     bindInteractions();
