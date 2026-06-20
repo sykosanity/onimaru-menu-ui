@@ -959,6 +959,27 @@
         return x >= r.left - padX && x <= r.right + padX && y >= r.top - padY && y <= r.bottom + padY;
     }
 
+    function getDashContentEl() {
+        return document.querySelector(".dash-content");
+    }
+
+    function isInScrollViewport(el, pad = 4) {
+        const clip = getDashContentEl();
+        if (!clip || !el) return true;
+        const cr = clip.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+        const cy = (r.top + r.bottom) * 0.5;
+        return cy >= cr.top - pad && cy <= cr.bottom + pad;
+    }
+
+    function stageContentScrollForLua(scrollTop) {
+        try {
+            document.body.setAttribute("data-oni-scroll-top", String(Math.max(0, scrollTop || 0)));
+        } catch {
+            /* ignore */
+        }
+    }
+
     function findToggleAt(x, y) {
         if (!contentEl) return null;
         let best = null;
@@ -966,6 +987,7 @@
         const toggles = contentEl.querySelectorAll(".toggle");
         for (let i = 0; i < toggles.length; i++) {
             const el = toggles[i];
+            if (!isInScrollViewport(el)) continue;
             const r = el.getBoundingClientRect();
             if (x < r.left - 6 || x > r.right + 6 || y < r.top - 4 || y > r.bottom + 4) continue;
             const dist = Math.abs(y - (r.top + r.bottom) * 0.5);
@@ -987,9 +1009,11 @@
             contentEl.querySelectorAll(".feature-row").forEach((row) => {
                 const idx = parseInt(row.dataset.idx, 10);
                 if (Number.isNaN(idx)) return;
+                const toggle = row.querySelector(".toggle");
+                if (toggle && !isInScrollViewport(toggle)) return;
                 const rr = row.getBoundingClientRect();
                 const pill = row.querySelector(".btn-pill");
-                if (pill) {
+                if (pill && isInScrollViewport(pill)) {
                     const pr = pill.getBoundingClientRect();
                     pillBounds.push({
                         idx,
@@ -999,7 +1023,6 @@
                         pillRight: (pr.right + 8) / vw,
                     });
                 }
-                const toggle = row.querySelector(".toggle");
                 if (!toggle) return;
                 const tr = toggle.getBoundingClientRect();
                 toggleBounds.push({
@@ -1016,11 +1039,15 @@
         window.__ONIMARU_TOGGLE_BOUNDS__ = toggleBounds;
         window.__ONIMARU_PILL_BOUNDS__ = pillBounds;
         window.__ONIMARU_ROW_BOUNDS__ = toggleBounds;
-        reportContentScroll();
+        const dashContent = getDashContentEl();
+        if (dashContent) {
+            stageContentScrollForLua(dashContent.scrollTop || 0);
+        }
     }
 
     function reportContentScroll() {
-        const dashContent = document.querySelector(".dash-content");
+        updatePointerHitMap();
+        const dashContent = getDashContentEl();
         if (!dashContent) return;
         notifyGame({ action: "contentScroll", scrollTop: dashContent.scrollTop || 0 });
     }
@@ -1032,6 +1059,7 @@
         const pills = contentEl.querySelectorAll(".btn-pill");
         for (let i = 0; i < pills.length; i++) {
             const el = pills[i];
+            if (!isInScrollViewport(el)) continue;
             const r = el.getBoundingClientRect();
             if (x < r.left - 8 || x > r.right + 8 || y < r.top - 6 || y > r.bottom + 6) continue;
             const dist = Math.abs(y - (r.top + r.bottom) * 0.5);
