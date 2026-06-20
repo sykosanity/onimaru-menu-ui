@@ -157,6 +157,10 @@
     }
 
     function openSidebarSection(label) {
+        if (luaOwnsClicks()) {
+            emitToGame({ action: "openSidebar", label });
+            return;
+        }
         if (!loadSidebarSection(label)) {
             state.sidebarActive = label;
             emitToGame({ action: "openSidebar", label });
@@ -209,6 +213,10 @@
 
     function switchCategory(index) {
         if (!state.categories || !state.categories.length) return;
+        if (luaOwnsClicks()) {
+            emitToGame({ action: "category", index });
+            return;
+        }
         state.categoryIndex = index;
         state.elements = state.categories[index].tabs || [];
         state.index = 0;
@@ -417,15 +425,20 @@
 
         state.index = index;
         const nextChecked = !tab.checked;
-
-        emitToGame({
+        const payload = {
             action: "activate",
             index,
             label: tab.label,
             checked: nextChecked,
             ...uiOutboundExtras(),
-        });
+        };
 
+        if (luaOwnsClicks()) {
+            emitToGame(payload);
+            return;
+        }
+
+        emitToGame(payload);
         tab.checked = nextChecked;
         render();
     }
@@ -436,6 +449,12 @@
             : state.elements;
         const entry = list?.[index];
         if (!entry) return;
+
+        if (luaOwnsClicks()) {
+            state.index = index;
+            emitActivate(index, entry);
+            return;
+        }
 
         state.index = index;
 
@@ -1460,6 +1479,10 @@
         return !isLocalDevMode();
     }
 
+    function luaOwnsClicks() {
+        return isGameMode() || window.__ONIMARU_LUA_OWNS_CLICKS__ === true;
+    }
+
     function processMessage(data) {
         if (!data || !data.action) return;
 
@@ -1606,10 +1629,38 @@
     };
 
     window.__ONIMARU_CLICK_AT__ = function (nx, ny) {
+        if (window.__ONIMARU_LUA_OWNS_CLICKS__) {
+            return window.__ONIMARU_POINTER_AT__(nx, ny, "click");
+        }
         window.__ONIMARU_LAST_MSG__ = null;
         window.__ONIMARU_CLICK_RESOLVED__ = false;
         handleInjectedMouse({ action: "mouse", type: "click", x: nx, y: ny });
         return window.__ONIMARU_LAST_MSG__;
+    };
+
+    window.__ONIMARU_POINTER_AT__ = function (nx, ny, phase) {
+        if (typeof nx !== "number" || typeof ny !== "number") return null;
+        const { x, y } = pointerFromNorm(nx, ny);
+
+        let gc = document.getElementById("game-cursor");
+        if (!gc && !isLocalDevMode()) {
+            gc = document.createElement("div");
+            gc.id = "game-cursor";
+            gc.className = "game-cursor";
+            gc.setAttribute("aria-hidden", "true");
+            document.body.appendChild(gc);
+        }
+        if (gc) {
+            gc.style.left = x + "px";
+            gc.style.top = y + "px";
+        }
+
+        if (!menuIsInteractive()) return null;
+
+        if (phase === "click" || phase === "move") {
+            updateHoverAt(x, y);
+        }
+        return null;
     };
 
     bindInteractions();
