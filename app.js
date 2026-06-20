@@ -978,6 +978,8 @@
                     idx,
                     top: rr.top / vh,
                     bottom: rr.bottom / vh,
+                    toggleTop: tr.top / vh,
+                    toggleBottom: tr.bottom / vh,
                     toggleLeft: (tr.left - 6) / vw,
                     toggleRight: (tr.right + 6) / vw,
                 });
@@ -986,6 +988,13 @@
         window.__ONIMARU_TOGGLE_BOUNDS__ = toggleBounds;
         window.__ONIMARU_PILL_BOUNDS__ = pillBounds;
         window.__ONIMARU_ROW_BOUNDS__ = toggleBounds;
+        reportContentScroll();
+    }
+
+    function reportContentScroll() {
+        const dashContent = document.querySelector(".dash-content");
+        if (!dashContent) return;
+        notifyGame({ action: "contentScroll", scrollTop: dashContent.scrollTop || 0 });
     }
 
     function findPillAt(x, y) {
@@ -1249,6 +1258,7 @@
         }
 
         if (data.type === "click") {
+            reportContentScroll();
             const el = elementAtPoint(x, y);
             firePointer(window, "pointerup", x, y);
             if (el) {
@@ -1580,6 +1590,11 @@
     function bindInteractions() {
         if (dashboard.dataset.bound === "1") return;
         dashboard.dataset.bound = "1";
+
+        const dashContent = document.querySelector(".dash-content");
+        if (dashContent) {
+            dashContent.addEventListener("scroll", reportContentScroll, { passive: true });
+        }
 
         dashboard.addEventListener("click", (e) => {
             if (!menuIsInteractive()) return;
