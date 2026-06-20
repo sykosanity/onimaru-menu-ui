@@ -158,18 +158,12 @@
 
     function openSidebarSection(label) {
         if (!loadSidebarSection(label)) {
-            if (isGameMode()) {
-                stageClickPayload(gamePayload({ action: "openSidebar", label }));
-                return;
-            }
-            state.sidebarActive = label;
-            emitToGame({ action: "openSidebar", label });
-            render();
+            notifyGame({ action: "openSidebar", label });
             return;
         }
         state.path = ["Onimaru", label];
         state.sidebarActive = label;
-        emitToGame({ action: "openSidebar", label });
+        notifyGame({ action: "openSidebar", label });
         render();
     }
 
@@ -213,14 +207,10 @@
 
     function switchCategory(index) {
         if (!state.categories || !state.categories.length) return;
-        if (isGameMode()) {
-            stageClickPayload(gamePayload({ action: "category", index }));
-            return;
-        }
         state.categoryIndex = index;
         state.elements = state.categories[index].tabs || [];
         state.index = 0;
-        emitToGame({ action: "category", index });
+        notifyGame({ action: "category", index });
         render();
     }
 
@@ -427,6 +417,12 @@
         markClickResolved();
     }
 
+    function notifyGame(payload) {
+        const msg = gamePayload(payload);
+        emitToGame(msg);
+        stageClickPayload(msg);
+    }
+
     function buildActivatePayload(index, flipToggle) {
         const tab = getActiveTabs()[index];
         if (!tab) return null;
@@ -588,12 +584,7 @@
 
         state.index = index;
         const payload = buildActivatePayload(index, true);
-        if (isGameMode()) {
-            stageClickPayload(payload);
-            return;
-        }
-
-        emitToGame(payload);
+        notifyGame(payload);
         tab.checked = !tab.checked;
         render();
     }
@@ -845,7 +836,7 @@
         const tab = findTabAt(x, y);
         if (tab) {
             if (tab.dataset.uiAction === "back") {
-                emitToGame({ action: "back" });
+                notifyGame({ action: "back" });
             } else {
                 switchCategory(parseInt(tab.dataset.tabIndex, 10));
             }
@@ -1096,6 +1087,9 @@
             if (el) {
                 fireMouse(el, "mouseup", x, y);
             }
+            if (pointerPressed) {
+                resolveMenuActionAt(x, y);
+            }
             pointerPressed = false;
             return;
         }
@@ -1106,9 +1100,7 @@
             if (el) {
                 fireMouse(el, "mouseup", x, y);
             }
-            if (!resolveMenuActionAt(x, y) && el) {
-                fireMouse(el, "click", x, y);
-            }
+            resolveMenuActionAt(x, y);
             pointerPressed = false;
         }
     }
@@ -1493,7 +1485,7 @@
             const tab = e.target.closest(".tab-item");
             if (tab) {
                 if (tab.dataset.uiAction === "back") {
-                    emitToGame({ action: "back" });
+                    notifyGame({ action: "back" });
                     return;
                 }
                 switchCategory(parseInt(tab.dataset.tabIndex, 10));
@@ -1791,37 +1783,15 @@
 
     window.__ONIMARU_COMPACT_CLICK__ = compactClickPayload;
 
-    window.__ONIMARU_CLICK_AT__ = function (nx, ny) {
-        window.__ONIMARU_CLICK_RESULT__ = null;
+    window.__ONIMARU_HANDLE_CLICK__ = function (nx, ny) {
         window.__ONIMARU_CLICK_RESOLVED__ = false;
-
-        const { x, y } = pointerFromNorm(nx, ny);
-
-        let gc = document.getElementById("game-cursor");
-        if (!gc && !isLocalDevMode()) {
-            gc = document.createElement("div");
-            gc.id = "game-cursor";
-            gc.className = "game-cursor";
-            gc.setAttribute("aria-hidden", "true");
-            document.body.appendChild(gc);
-        }
-        if (gc) {
-            gc.style.left = x + "px";
-            gc.style.top = y + "px";
-        }
-
-        if (!menuIsInteractive()) return null;
-
-        updateHoverAt(x, y);
-
-        if (isGameMode()) {
-            const payload = resolveClickPayloadAt(x, y);
-            if (payload) stageClickPayload(payload);
-            return payload;
-        }
-
         handleInjectedMouse({ action: "mouse", type: "click", x: nx, y: ny });
-        return window.__ONIMARU_LAST_MSG__;
+        return window.__ONIMARU_CLICK_RESOLVED__ === true;
+    };
+
+    window.__ONIMARU_CLICK_AT__ = function (nx, ny) {
+        window.__ONIMARU_HANDLE_CLICK__(nx, ny);
+        return window.__ONIMARU_CLICK_RESULT__ || window.__ONIMARU_LAST_MSG__ || null;
     };
 
     bindInteractions();
