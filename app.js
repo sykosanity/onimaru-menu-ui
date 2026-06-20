@@ -587,6 +587,7 @@
     function resolvePointerActivateAt(x, y) {
         if (!menuIsInteractive()) return "";
 
+        updatePointerHitMap();
         const toggle = findToggleAt(x, y);
         if (toggle) {
             const row = toggle.closest(".feature-row");
@@ -917,12 +918,45 @@
 
     function findToggleAt(x, y) {
         if (!contentEl) return null;
+        let best = null;
+        let bestDist = Infinity;
         const toggles = contentEl.querySelectorAll(".toggle");
-        for (let i = toggles.length - 1; i >= 0; i--) {
+        for (let i = 0; i < toggles.length; i++) {
             const el = toggles[i];
-            if (rectHitExpanded(el, x, y, 6, 10)) return el;
+            const r = el.getBoundingClientRect();
+            if (x < r.left - 6 || x > r.right + 6 || y < r.top - 4 || y > r.bottom + 4) continue;
+            const dist = Math.abs(y - (r.top + r.bottom) * 0.5);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = el;
+            }
         }
-        return null;
+        return best;
+    }
+
+    /** Screen-normalized row/toggle bounds for Lua inject hit tests (adjacent toggles). */
+    function updatePointerHitMap() {
+        const vw = document.documentElement.clientWidth || window.innerWidth || 1;
+        const vh = document.documentElement.clientHeight || window.innerHeight || 1;
+        const bounds = [];
+        if (contentEl) {
+            contentEl.querySelectorAll(".feature-row").forEach((row) => {
+                const idx = parseInt(row.dataset.idx, 10);
+                if (Number.isNaN(idx)) return;
+                const toggle = row.querySelector(".toggle");
+                if (!toggle) return;
+                const rr = row.getBoundingClientRect();
+                const tr = toggle.getBoundingClientRect();
+                bounds.push({
+                    idx,
+                    top: rr.top / vh,
+                    bottom: rr.bottom / vh,
+                    toggleLeft: (tr.left - 6) / vw,
+                    toggleRight: (tr.right + 6) / vw,
+                });
+            });
+        }
+        window.__ONIMARU_ROW_BOUNDS__ = bounds;
     }
 
     function findPillAt(x, y) {
@@ -948,6 +982,7 @@
             return true;
         }
 
+        updatePointerHitMap();
         const toggle = findToggleAt(x, y);
         if (toggle) {
             const toggleRow = toggle.closest(".feature-row");
@@ -1384,11 +1419,13 @@
         renderContent();
         updateDesc();
         applyChromeHover();
+        updatePointerHitMap();
         requestAnimationFrame(() => {
             document.querySelector(".feature-row.active, .submenu-card.active")?.scrollIntoView({
                 block: "nearest",
                 behavior: "smooth",
             });
+            updatePointerHitMap();
         });
     }
 
@@ -1854,12 +1891,15 @@
 
     window.__ONIMARU_COMPACT_CLICK__ = compactClickPayload;
 
+    window.__ONIMARU_REFRESH_HIT_MAP__ = updatePointerHitMap;
+
     window.__ONIMARU_RUN_POINTER_CLICK__ = function (nx, ny) {
         if (window.__ONIMARU_INJECT_RESULT__) {
             return window.__ONIMARU_INJECT_RESULT__;
         }
         window.__ONIMARU_POINTER_CONSUMED__ = false;
         window.__ONIMARU_INJECT_RESULT__ = "";
+        updatePointerHitMap();
         const { x, y } = pointerFromNorm(nx, ny);
         let compact = "";
         try {
