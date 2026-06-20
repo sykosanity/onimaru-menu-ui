@@ -427,7 +427,7 @@
     function buildActivatePayload(index, flipToggle) {
         const tab = getActiveTabs()[index];
         if (!tab) return null;
-        const payload = { action: "activate", index, label: tab.label };
+        const payload = { action: "activate", index, label: tab.label || "" };
         if (flipToggle) payload.checked = !tab.checked;
         return gamePayload(payload);
     }
@@ -571,8 +571,12 @@
     }
 
     function emitActivate(index, entry) {
-        const payload = { action: "activate", index, ...uiOutboundExtras() };
-        if (entry?.label) payload.label = entry.label;
+        const payload = {
+            action: "activate",
+            index,
+            label: entry?.label || getActiveTabs()[index]?.label || "",
+            ...uiOutboundExtras(),
+        };
         notifyGame(payload);
     }
 
