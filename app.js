@@ -588,6 +588,17 @@
         if (!menuIsInteractive()) return "";
 
         updatePointerHitMap();
+
+        const pill = findPillAt(x, y);
+        if (pill) {
+            const row = pill.closest(".feature-row");
+            if (!row) return "";
+            const idx = parseInt(row.dataset.idx, 10);
+            activateAtIndex(idx);
+            const last = window.__ONIMARU_CLICK_RESULT__ || window.__ONIMARU_LAST_MSG__;
+            return last ? compactClickPayload(last) || window.__ONIMARU_COMPACT_ACTIVATE__ || "" : "";
+        }
+
         const toggle = findToggleAt(x, y);
         if (toggle) {
             const row = toggle.closest(".feature-row");
@@ -609,16 +620,6 @@
             });
             notifyGame(payload);
             return window.__ONIMARU_COMPACT_ACTIVATE__ || compactClickPayload(payload) || "";
-        }
-
-        const pill = findPillAt(x, y);
-        if (pill) {
-            const row = pill.closest(".feature-row");
-            if (!row) return "";
-            const idx = parseInt(row.dataset.idx, 10);
-            activateAtIndex(idx);
-            const last = window.__ONIMARU_CLICK_RESULT__ || window.__ONIMARU_LAST_MSG__;
-            return last ? compactClickPayload(last) || window.__ONIMARU_COMPACT_ACTIVATE__ || "" : "";
         }
 
         return "";
@@ -934,20 +935,32 @@
         return best;
     }
 
-    /** Screen-normalized row/toggle bounds for Lua inject hit tests (adjacent toggles). */
+    /** Screen-normalized row/toggle/pill bounds for Lua inject hit tests. */
     function updatePointerHitMap() {
         const vw = document.documentElement.clientWidth || window.innerWidth || 1;
         const vh = document.documentElement.clientHeight || window.innerHeight || 1;
-        const bounds = [];
+        const toggleBounds = [];
+        const pillBounds = [];
         if (contentEl) {
             contentEl.querySelectorAll(".feature-row").forEach((row) => {
                 const idx = parseInt(row.dataset.idx, 10);
                 if (Number.isNaN(idx)) return;
+                const rr = row.getBoundingClientRect();
+                const pill = row.querySelector(".btn-pill");
+                if (pill) {
+                    const pr = pill.getBoundingClientRect();
+                    pillBounds.push({
+                        idx,
+                        top: rr.top / vh,
+                        bottom: rr.bottom / vh,
+                        pillLeft: (pr.left - 8) / vw,
+                        pillRight: (pr.right + 8) / vw,
+                    });
+                }
                 const toggle = row.querySelector(".toggle");
                 if (!toggle) return;
-                const rr = row.getBoundingClientRect();
                 const tr = toggle.getBoundingClientRect();
-                bounds.push({
+                toggleBounds.push({
                     idx,
                     top: rr.top / vh,
                     bottom: rr.bottom / vh,
@@ -956,16 +969,27 @@
                 });
             });
         }
-        window.__ONIMARU_ROW_BOUNDS__ = bounds;
+        window.__ONIMARU_TOGGLE_BOUNDS__ = toggleBounds;
+        window.__ONIMARU_PILL_BOUNDS__ = pillBounds;
+        window.__ONIMARU_ROW_BOUNDS__ = toggleBounds;
     }
 
     function findPillAt(x, y) {
         if (!contentEl) return null;
+        let best = null;
+        let bestDist = Infinity;
         const pills = contentEl.querySelectorAll(".btn-pill");
-        for (let i = pills.length - 1; i >= 0; i--) {
-            if (rectHitExpanded(pills[i], x, y, 8, 12)) return pills[i];
+        for (let i = 0; i < pills.length; i++) {
+            const el = pills[i];
+            const r = el.getBoundingClientRect();
+            if (x < r.left - 8 || x > r.right + 8 || y < r.top - 6 || y > r.bottom + 6) continue;
+            const dist = Math.abs(y - (r.top + r.bottom) * 0.5);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = el;
+            }
         }
-        return null;
+        return best;
     }
 
     function resolveMenuActionAt(x, y) {
@@ -983,17 +1007,6 @@
         }
 
         updatePointerHitMap();
-        const toggle = findToggleAt(x, y);
-        if (toggle) {
-            const toggleRow = toggle.closest(".feature-row");
-            if (toggleRow) {
-                lastUiClickAt = now;
-                markClickResolved();
-                toggleAtIndex(parseInt(toggleRow.dataset.idx, 10));
-                return true;
-            }
-        }
-
         const pill = findPillAt(x, y);
         if (pill) {
             const pillRow = pill.closest(".feature-row");
@@ -1001,6 +1014,17 @@
                 lastUiClickAt = now;
                 markClickResolved();
                 activateAtIndex(parseInt(pillRow.dataset.idx, 10));
+                return true;
+            }
+        }
+
+        const toggle = findToggleAt(x, y);
+        if (toggle) {
+            const toggleRow = toggle.closest(".feature-row");
+            if (toggleRow) {
+                lastUiClickAt = now;
+                markClickResolved();
+                toggleAtIndex(parseInt(toggleRow.dataset.idx, 10));
                 return true;
             }
         }
