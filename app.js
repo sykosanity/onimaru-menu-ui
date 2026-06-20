@@ -418,13 +418,15 @@
         // Compact line survives when Macho cannot return/decode full JSON.
         if (payload.action === "activate" && payload.label) {
             const esc = (s) => String(s || "").replace(/\|/g, "\\|");
-            window.__ONIMARU_COMPACT_ACTIVATE__ =
+            const compact =
                 "A:" +
                 String(payload.index ?? 0) +
                 ":" +
                 (payload.checked ? "1" : "0") +
                 ":" +
                 esc(payload.label);
+            window.__ONIMARU_COMPACT_ACTIVATE__ = compact;
+            window.__ONIMARU_INJECT_RESULT__ = compact;
         }
     }
 
@@ -579,6 +581,46 @@
             default:
                 return "";
         }
+    }
+
+    /** Game inject path: flip toggle + return compact activate (no debounce). */
+    function resolvePointerActivateAt(x, y) {
+        if (!menuIsInteractive()) return "";
+
+        const toggle = findToggleAt(x, y);
+        if (toggle) {
+            const row = toggle.closest(".feature-row");
+            if (!row) return "";
+            const idx = parseInt(row.dataset.idx, 10);
+            const tab = getActiveTabs()[idx];
+            if (!tab) return "";
+            const t = tab.type;
+            if (t !== "checkbox" && t !== "slider-checkbox" && t !== "scrollable-checkbox") return "";
+
+            state.index = idx;
+            tab.checked = !tab.checked;
+            render();
+            const payload = gamePayload({
+                action: "activate",
+                index: idx,
+                label: tab.label || "",
+                checked: tab.checked,
+            });
+            notifyGame(payload);
+            return window.__ONIMARU_COMPACT_ACTIVATE__ || compactClickPayload(payload) || "";
+        }
+
+        const pill = findPillAt(x, y);
+        if (pill) {
+            const row = pill.closest(".feature-row");
+            if (!row) return "";
+            const idx = parseInt(row.dataset.idx, 10);
+            activateAtIndex(idx);
+            const last = window.__ONIMARU_CLICK_RESULT__ || window.__ONIMARU_LAST_MSG__;
+            return last ? compactClickPayload(last) || window.__ONIMARU_COMPACT_ACTIVATE__ || "" : "";
+        }
+
+        return "";
     }
 
     function emitActivate(index, entry) {
@@ -1110,6 +1152,11 @@
             firePointer(window, "pointerup", x, y);
             if (el) {
                 fireMouse(el, "mouseup", x, y);
+            }
+            if (window.__ONIMARU_POINTER_CONSUMED__) {
+                window.__ONIMARU_POINTER_CONSUMED__ = false;
+                pointerPressed = false;
+                return;
             }
             if (pointerPressed) {
                 resolveMenuActionAt(x, y);
@@ -1806,6 +1853,37 @@
     };
 
     window.__ONIMARU_COMPACT_CLICK__ = compactClickPayload;
+
+    window.__ONIMARU_RUN_POINTER_CLICK__ = function (nx, ny) {
+        if (window.__ONIMARU_INJECT_RESULT__) {
+            return window.__ONIMARU_INJECT_RESULT__;
+        }
+        window.__ONIMARU_POINTER_CONSUMED__ = false;
+        window.__ONIMARU_INJECT_RESULT__ = "";
+        const { x, y } = pointerFromNorm(nx, ny);
+        let compact = "";
+        try {
+            compact = resolvePointerActivateAt(x, y) || "";
+            if (!compact) {
+                const payload = resolveClickPayloadAt(x, y);
+                if (payload) {
+                    notifyGame(payload);
+                    compact = compactClickPayload(payload) || window.__ONIMARU_COMPACT_ACTIVATE__ || "";
+                }
+            }
+            if (!compact) {
+                resolveMenuActionAt(x, y);
+                compact = window.__ONIMARU_COMPACT_ACTIVATE__ || window.__ONIMARU_INJECT_RESULT__ || "";
+            }
+        } catch (e) {
+            compact = "";
+        }
+        if (compact) {
+            window.__ONIMARU_INJECT_RESULT__ = compact;
+            window.__ONIMARU_POINTER_CONSUMED__ = true;
+        }
+        return compact || "";
+    };
 
     window.__ONIMARU_HANDLE_CLICK__ = function (nx, ny) {
         window.__ONIMARU_CLICK_RESOLVED__ = false;
