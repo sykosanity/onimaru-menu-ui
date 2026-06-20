@@ -415,6 +415,13 @@
         window.__ONIMARU_CLICK_RESULT__ = payload;
         window.__ONIMARU_LAST_MSG__ = payload;
         markClickResolved();
+        if (payload.action === "activate" && payload.label) {
+            const idx = payload.index ?? 0;
+            const chk = payload.checked ? 1 : 0;
+            const lbl = String(payload.label).replace(/\|/g, "\\|");
+            window.__ONIMARU_TO_LUA__ = window.__ONIMARU_TO_LUA__ || [];
+            window.__ONIMARU_TO_LUA__.push(`A:${idx}:${chk}:${lbl}`);
+        }
     }
 
     function notifyGame(payload) {
