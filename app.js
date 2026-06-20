@@ -372,6 +372,7 @@
         afterLocalChange({
             action: "slider",
             index,
+            label: tab?.label,
             value: tab?.value,
             pct:
                 trackEl && trackEl.getBoundingClientRect
