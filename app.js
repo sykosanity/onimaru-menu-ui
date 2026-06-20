@@ -1161,7 +1161,17 @@
                 const catIdx = Math.max(0, Math.min(state.categories.length - 1, state.categoryIndex || 0));
                 state.categoryIndex = catIdx;
                 const cat = state.categories[catIdx];
-                if (cat) cat.tabs = data.elements;
+                if (cat) {
+                    cat.tabs = data.elements;
+                    // Mirror checked state onto category tabs by label (fixes reopen showing toggles off).
+                    for (let i = 0; i < data.elements.length; i++) {
+                        const el = data.elements[i];
+                        const tab = cat.tabs[i];
+                        if (el && tab && el.label === tab.label && typeof el.checked === "boolean") {
+                            tab.checked = el.checked;
+                        }
+                    }
+                }
             }
         } else if (state.categories?.length) {
             const catIdx = Math.max(0, Math.min(state.categories.length - 1, state.categoryIndex || 0));
