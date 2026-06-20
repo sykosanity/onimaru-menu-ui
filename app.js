@@ -158,7 +158,9 @@
 
     function openSidebarSection(label) {
         if (!loadSidebarSection(label)) {
-            if (isGameMode()) emitToGame({ action: "openSidebar", label });
+            state.sidebarActive = label;
+            emitToGame({ action: "openSidebar", label });
+            render();
             return;
         }
         state.path = ["Onimaru", label];
@@ -482,10 +484,8 @@
         const msg = { source: "onimaru-ui", ...payload };
         const raw = JSON.stringify(msg);
         window.__ONIMARU_UI_OUTBOX__ = window.__ONIMARU_UI_OUTBOX__ || [];
-        window.__ONIMARU_TO_LUA__ = window.__ONIMARU_TO_LUA__ || [];
         window.__ONIMARU_LAST_MSG__ = msg;
         window.__ONIMARU_UI_OUTBOX__.push(raw);
-        window.__ONIMARU_TO_LUA__.push(raw);
 
         try {
             if (typeof window.machoPost === "function") {
