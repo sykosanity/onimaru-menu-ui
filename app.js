@@ -625,14 +625,18 @@
             if (t !== "checkbox" && t !== "slider-checkbox" && t !== "scrollable-checkbox") return "";
 
             state.index = idx;
-            tab.checked = !tab.checked;
-            stageToggleStateForLua(tab.label, tab.checked);
+            const newChecked = !tab.checked;
+            mutateActiveTabs((list) => {
+                const row = list[idx];
+                if (row) row.checked = newChecked;
+            });
+            stageToggleStateForLua(tab.label, newChecked);
             render();
             const payload = gamePayload({
                 action: "activate",
                 index: idx,
                 label: tab.label || "",
-                checked: tab.checked,
+                checked: newChecked,
             });
             notifyGame(payload);
             return window.__ONIMARU_COMPACT_ACTIVATE__ || compactClickPayload(payload) || "";
@@ -677,15 +681,19 @@
         if (t !== "checkbox" && t !== "slider-checkbox" && t !== "scrollable-checkbox") return;
 
         state.index = index;
-        tab.checked = !tab.checked;
-        stageToggleStateForLua(tab.label, tab.checked);
+        const newChecked = !tab.checked;
+        mutateActiveTabs((list) => {
+            const row = list[index];
+            if (row) row.checked = newChecked;
+        });
+        stageToggleStateForLua(tab.label, newChecked);
         render();
         notifyGame(
             gamePayload({
                 action: "activate",
                 index,
                 label: tab.label || "",
-                checked: tab.checked,
+                checked: newChecked,
             })
         );
     }
@@ -1836,8 +1844,7 @@
                 applyPayload(data);
                 if (!data.visible) {
                     setTimeout(() => {
-                        state.index = 0;
-                        state.categories = null;
+                        if (!state.visible) state.index = 0;
                     }, 250);
                 }
                 render();
