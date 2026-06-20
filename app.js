@@ -418,7 +418,8 @@
     }
 
     function notifyGame(payload) {
-        const msg = gamePayload(payload);
+        if (!payload) return;
+        const msg = payload.source === "onimaru-ui" ? payload : gamePayload(payload);
         emitToGame(msg);
         stageClickPayload(msg);
     }
@@ -584,6 +585,7 @@
 
         state.index = index;
         const payload = buildActivatePayload(index, true);
+        if (!payload) return;
         notifyGame(payload);
         tab.checked = !tab.checked;
         render();
