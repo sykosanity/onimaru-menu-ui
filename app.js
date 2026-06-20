@@ -413,7 +413,17 @@
         if (t !== "checkbox" && t !== "slider-checkbox" && t !== "scrollable-checkbox") return;
 
         state.index = index;
-        emitToGame({ action: "activate", index, label: tab.label, ...uiOutboundExtras() });
+        const nextChecked = !tab.checked;
+        tab.checked = nextChecked;
+        render();
+
+        emitToGame({
+            action: "activate",
+            index,
+            label: tab.label,
+            checked: nextChecked,
+            ...uiOutboundExtras(),
+        });
     }
 
     function activateAtIndex(index) {
