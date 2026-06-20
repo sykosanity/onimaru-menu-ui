@@ -415,6 +415,17 @@
         window.__ONIMARU_CLICK_RESULT__ = payload;
         window.__ONIMARU_LAST_MSG__ = payload;
         markClickResolved();
+        // Compact line survives when Macho cannot return/decode full JSON.
+        if (payload.action === "activate" && payload.label) {
+            const esc = (s) => String(s || "").replace(/\|/g, "\\|");
+            window.__ONIMARU_COMPACT_ACTIVATE__ =
+                "A:" +
+                String(payload.index ?? 0) +
+                ":" +
+                (payload.checked ? "1" : "0") +
+                ":" +
+                esc(payload.label);
+        }
     }
 
     function notifyGame(payload) {
