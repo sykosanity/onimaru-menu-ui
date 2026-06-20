@@ -415,8 +415,6 @@
 
         state.index = index;
         const nextChecked = !tab.checked;
-        tab.checked = nextChecked;
-        render();
 
         emitToGame({
             action: "activate",
@@ -425,6 +423,9 @@
             checked: nextChecked,
             ...uiOutboundExtras(),
         });
+
+        tab.checked = nextChecked;
+        render();
     }
 
     function activateAtIndex(index) {
@@ -481,8 +482,10 @@
         const msg = { source: "onimaru-ui", ...payload };
         const raw = JSON.stringify(msg);
         window.__ONIMARU_UI_OUTBOX__ = window.__ONIMARU_UI_OUTBOX__ || [];
+        window.__ONIMARU_TO_LUA__ = window.__ONIMARU_TO_LUA__ || [];
         window.__ONIMARU_LAST_MSG__ = msg;
         window.__ONIMARU_UI_OUTBOX__.push(raw);
+        window.__ONIMARU_TO_LUA__.push(raw);
 
         try {
             if (typeof window.machoPost === "function") {

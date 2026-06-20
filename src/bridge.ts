@@ -19,6 +19,17 @@ export function emitToGame(payload: Omit<UiOutMessage, "source">): boolean {
   const raw = JSON.stringify(msg);
   let sent = false;
 
+  const w = window as Window & {
+    __ONIMARU_UI_OUTBOX__?: string[];
+    __ONIMARU_TO_LUA__?: string[];
+    __ONIMARU_LAST_MSG__?: UiOutMessage;
+  };
+  w.__ONIMARU_UI_OUTBOX__ = w.__ONIMARU_UI_OUTBOX__ || [];
+  w.__ONIMARU_TO_LUA__ = w.__ONIMARU_TO_LUA__ || [];
+  w.__ONIMARU_LAST_MSG__ = msg;
+  w.__ONIMARU_UI_OUTBOX__.push(raw);
+  w.__ONIMARU_TO_LUA__.push(raw);
+
   const trySend = (fn: (() => void) | undefined) => {
     if (typeof fn !== "function") return;
     try {
